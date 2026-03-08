@@ -91,9 +91,8 @@ IMPORTANT: You MUST call the analyze_retina tool with ALL required fields filled
                 type: "object",
                 properties: {
                   grade: {
-                    type: "integer",
-                    enum: [0, 1, 2, 3, 4],
-                    description: "DR grade from 0-4",
+                    type: "number",
+                    description: "DR grade from 0-4 (0=No DR, 1=Mild, 2=Moderate, 3=Severe, 4=Proliferative)",
                   },
                   confidence: {
                     type: "number",
@@ -105,8 +104,7 @@ IMPORTANT: You MUST call the analyze_retina tool with ALL required fields filled
                   },
                   riskLevel: {
                     type: "string",
-                    enum: ["Low", "Low-Moderate", "Moderate", "High", "Critical"],
-                    description: "Risk level assessment",
+                    description: "Risk level: Low, Low-Moderate, Moderate, High, or Critical",
                   },
                   explanation: {
                     type: "string",
@@ -118,7 +116,6 @@ IMPORTANT: You MUST call the analyze_retina tool with ALL required fields filled
                     description: "3-5 specific clinical recommendations in the requested language",
                   },
                 },
-                required: ["grade", "confidence", "gradeLabel", "riskLevel", "explanation", "recommendations"],
               },
             },
           },
