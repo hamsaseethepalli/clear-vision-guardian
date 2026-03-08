@@ -1,5 +1,8 @@
 import * as ort from "onnxruntime-web";
 
+// Configure WASM to load from CDN to avoid MIME type issues
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/";
+
 // ImageNet normalization constants
 const IMAGENET_MEAN = [0.485, 0.456, 0.406];
 const IMAGENET_STD = [0.229, 0.224, 0.225];
