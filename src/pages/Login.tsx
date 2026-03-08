@@ -7,10 +7,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import logo from "@/assets/retino-logo.png";
 import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -20,18 +22,17 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
-    // Mock login - route based on email pattern
-    setTimeout(() => {
-      setLoading(false);
-      if (email.includes("doctor")) {
-        navigate("/doctor");
-      } else if (email.includes("admin")) {
-        navigate("/admin");
-      } else {
-        navigate("/patient");
-      }
-      toast({ title: "Welcome back!", description: "You have been logged in successfully." });
-    }, 1000);
+    const { error } = await signIn(email, password);
+    setLoading(false);
+
+    if (error) {
+      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Welcome back!", description: "You have been logged in successfully." });
+    // Role-based redirect happens via ProtectedRoute / useEffect
+    navigate("/patient");
   };
 
   return (
@@ -88,9 +89,6 @@ export default function Login() {
               <Link to="/signup" className="text-primary hover:underline font-medium">
                 Sign up
               </Link>
-            </p>
-            <p className="text-center text-xs text-muted-foreground">
-              Tip: Use "doctor@" for doctor view, "admin@" for admin
             </p>
           </form>
         </CardContent>
