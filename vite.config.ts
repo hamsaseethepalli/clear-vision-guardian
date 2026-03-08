@@ -21,5 +21,5 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: ["onnxruntime-web"],
   },
-  assetsInclude: ["**/*.wasm"],
+  assetsInclude: ["**/*.wasm", "**/*.onnx"],
 }));
