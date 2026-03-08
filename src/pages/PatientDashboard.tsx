@@ -126,30 +126,34 @@ export default function PatientDashboard() {
     updateStep(0, "complete");
     updateStep(1, "active");
 
-    // Step 2: ONNX Model for accurate grading, then Gemini for explanation
+    // Step 2: Try ONNX model first, fall back to Gemini-only
     let result: ONNXResult;
     try {
-      // First: run ONNX model for accurate grade classification
-      const { analyzeRetinalImage } = await import("@/lib/onnxInference");
-      const onnxResult = await analyzeRetinalImage(file);
+      let onnxResult: ONNXResult | null = null;
       
-      // Then: send image + ONNX grade to Gemini for detailed explanation in user's language
-      const imageBase64 = await fileToBase64(file);
-      const { data: aiData, error: aiError } = await supabase.functions.invoke("analyze-retina", {
-        body: { 
-          imageBase64, 
-          language,
-          onnxGrade: onnxResult.grade,
-          onnxGradeLabel: onnxResult.gradeLabel,
-          onnxRiskLevel: onnxResult.riskLevel,
-        },
-      });
+      // Try ONNX model for accurate grading
+      try {
+        const { analyzeRetinalImage } = await import("@/lib/onnxInference");
+        onnxResult = await analyzeRetinalImage(file);
+      } catch (onnxErr) {
+        console.warn("ONNX model unavailable, using Gemini only:", onnxErr);
+      }
 
-      if (aiError || aiData?.error) {
-        // Fallback: use ONNX result with default explanation
-        result = onnxResult;
-      } else {
-        // Use ONNX grade but Gemini's explanation and recommendations
+      const imageBase64 = await fileToBase64(file);
+      const body: Record<string, unknown> = { imageBase64, language };
+      if (onnxResult) {
+        body.onnxGrade = onnxResult.grade;
+        body.onnxGradeLabel = onnxResult.gradeLabel;
+        body.onnxRiskLevel = onnxResult.riskLevel;
+      }
+
+      const { data: aiData, error: aiError } = await supabase.functions.invoke("analyze-retina", { body });
+
+      if (aiError) throw new Error(aiError.message);
+      if (aiData?.error) throw new Error(aiData.error);
+
+      if (onnxResult) {
+        // Use ONNX grade + Gemini explanation
         result = {
           grade: onnxResult.grade,
           confidence: onnxResult.confidence,
@@ -158,6 +162,17 @@ export default function PatientDashboard() {
           explanation: aiData.explanation || onnxResult.explanation,
           recommendations: aiData.recommendations || onnxResult.recommendations,
           probabilities: onnxResult.probabilities,
+        };
+      } else {
+        // Gemini-only fallback
+        result = {
+          grade: aiData.grade as 0|1|2|3|4,
+          confidence: aiData.confidence ?? 0.8,
+          gradeLabel: aiData.gradeLabel,
+          riskLevel: aiData.riskLevel,
+          explanation: aiData.explanation,
+          recommendations: aiData.recommendations || [],
+          probabilities: [0, 1, 2, 3, 4].map(g => g === aiData.grade ? 0.8 : 0.05),
         };
       }
     } catch (err) {
