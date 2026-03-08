@@ -30,18 +30,28 @@ serve(async (req) => {
       ml: "Malayalam",
     }[language || "en"] || "English";
 
-    // Use ONNX grade if provided, otherwise let Gemini grade
     const hasOnnxGrade = onnxGrade !== undefined && onnxGrade !== null;
     
     const gradeContext = hasOnnxGrade 
-      ? `\n\nIMPORTANT: A specialized retinopathy classification model has determined this image is Grade ${onnxGrade} (${onnxGradeLabel}, Risk: ${onnxRiskLevel}). You MUST use this grade. Do NOT change the grade. Your job is ONLY to provide a detailed clinical explanation and recommendations for this grade based on what you see in the image.`
+      ? `\n\nCRITICAL: A specialized retinopathy classification model has determined this image is Grade ${onnxGrade} (${onnxGradeLabel}, Risk: ${onnxRiskLevel}). You MUST use this exact grade (${onnxGrade}). Do NOT change the grade under any circumstances. Your job is ONLY to provide a detailed clinical explanation and recommendations consistent with Grade ${onnxGrade}.`
       : "";
 
-    const systemPrompt = `You are an expert ophthalmologist AI. Analyze the retinal fundus image and respond using the "analyze_retina" tool. Write in ${langName}.
+    const systemPrompt = `You are an expert ophthalmologist AI specialized in diabetic retinopathy (DR) grading using the International Clinical Diabetic Retinopathy (ICDR) severity scale. Analyze the retinal fundus image and respond using the "analyze_retina" tool. Write all text in ${langName}.
 
-Grade scale: 0=No DR, 1=Mild NPDR (microaneurysms only), 2=Moderate NPDR, 3=Severe NPDR, 4=Proliferative DR.${gradeContext}
+STRICT GRADING CRITERIA (ICDR Scale):
+- Grade 0 (No DR): NO microaneurysms, NO hemorrhages, NO exudates, NO cotton wool spots, NO IRMA, NO venous beading, NO neovascularization. Completely normal retina.
+- Grade 1 (Mild NPDR): ONLY microaneurysms present. No other lesions. If you see ANY hemorrhages, hard exudates, or cotton wool spots beyond just microaneurysms, it is NOT Grade 1.
+- Grade 2 (Moderate NPDR): More than just microaneurysms but less than severe NPDR. May include: dot-blot hemorrhages, hard exudates, cotton wool spots, but NOT meeting the 4-2-1 rule.
+- Grade 3 (Severe NPDR): Must meet at least ONE of the 4-2-1 rule criteria: (a) >20 intraretinal hemorrhages in each of 4 quadrants, OR (b) definite venous beading in ≥2 quadrants, OR (c) prominent IRMA in ≥1 quadrant. NO neovascularization.
+- Grade 4 (Proliferative DR): Neovascularization (NVD or NVE) and/or vitreous/preretinal hemorrhage. Fibrovascular proliferation may be present.
 
-Provide a detailed, image-specific clinical explanation describing what you observe. List 3-5 actionable clinical recommendations.
+IMPORTANT GRADING RULES:
+- Be precise. Grade 1 means ONLY microaneurysms, nothing else.
+- If you see hemorrhages + exudates, it's at LEAST Grade 2.
+- If image quality is poor, state that in explanation but still provide your best assessment.
+- Do NOT default to Grade 0 unless you are confident the retina is truly normal.${gradeContext}
+
+Provide a detailed, image-specific clinical explanation describing exactly what lesions you observe and where. List 3-5 actionable clinical recommendations appropriate for the grade.
 
 IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null values.`;
 
@@ -53,7 +63,7 @@ IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null valu
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        temperature: 0.2,
+        temperature: 0.1,
         messages: [
           { role: "system", content: systemPrompt },
           {
@@ -65,7 +75,7 @@ IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null valu
               },
               {
                 type: "text",
-                text: `Analyze this retinal fundus image for diabetic retinopathy. You MUST provide a grade (0-4), confidence (0.0-1.0), gradeLabel, riskLevel, explanation, and recommendations. Respond in ${langName}.`,
+                text: `Carefully analyze this retinal fundus image for diabetic retinopathy. Look for: microaneurysms, dot-blot hemorrhages, hard exudates, cotton wool spots, venous beading, IRMA, neovascularization. Grade strictly using the ICDR scale (0-4). Provide grade, confidence (0.0-1.0), gradeLabel, riskLevel, explanation, and recommendations. All text must be in ${langName}.`,
               },
             ],
           },
@@ -75,13 +85,13 @@ IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null valu
             type: "function",
             function: {
               name: "analyze_retina",
-              description: "Return the DR grading analysis result. All fields are required.",
+              description: "Return the DR grading analysis result. All fields are required and must not be null.",
               parameters: {
                 type: "object",
                 properties: {
                   grade: {
                     type: "number",
-                    description: "DR grade from 0-4 (0=No DR, 1=Mild, 2=Moderate, 3=Severe, 4=Proliferative)",
+                    description: "DR grade 0-4 using ICDR scale (0=No DR, 1=Mild NPDR - microaneurysms only, 2=Moderate NPDR, 3=Severe NPDR - 4-2-1 rule, 4=PDR - neovascularization)",
                   },
                   confidence: {
                     type: "number",
@@ -97,7 +107,7 @@ IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null valu
                   },
                   explanation: {
                     type: "string",
-                    description: "Detailed clinical explanation specific to this image in the requested language",
+                    description: "Detailed clinical explanation listing specific lesions observed and their locations in the requested language",
                   },
                   recommendations: {
                     type: "array",
@@ -105,6 +115,7 @@ IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null valu
                     description: "3-5 specific clinical recommendations in the requested language",
                   },
                 },
+                required: ["grade", "confidence", "gradeLabel", "riskLevel", "explanation", "recommendations"],
               },
             },
           },
@@ -150,13 +161,9 @@ IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null valu
     const result = JSON.parse(toolCall.function.arguments);
     console.log("Parsed result:", JSON.stringify(result));
 
-    // Validate all required fields exist and provide defaults if missing
-    if (result.grade === null || result.grade === undefined) {
-      result.grade = 0;
-    }
-    if (result.confidence === null || result.confidence === undefined) {
-      result.confidence = 0.5;
-    }
+    // Validate and provide defaults for missing fields
+    if (result.grade === null || result.grade === undefined) result.grade = 0;
+    if (result.confidence === null || result.confidence === undefined) result.confidence = 0.5;
     if (!result.gradeLabel) {
       const defaultLabels = ["No DR", "Mild NPDR", "Moderate NPDR", "Severe NPDR", "Proliferative DR"];
       result.gradeLabel = defaultLabels[result.grade] || "Unknown";
