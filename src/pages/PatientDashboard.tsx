@@ -194,8 +194,9 @@ export default function PatientDashboard() {
       case "doctors":
         return renderDoctorsView();
       case "settings":
+        return <PatientSettingsPage />;
       case "account":
-        return <PatientSettings />;
+        return <PatientAccountPage />;
       default:
         return <PatientHome reports={reports} onNavigate={setActiveView} />;
     }
