@@ -1,14 +1,8 @@
 import * as ort from "onnxruntime-web";
 
-// Configure WASM paths before any session creation
+// Configure WASM: use CDN, single thread, no SIMD to maximize compatibility
 ort.env.wasm.numThreads = 1;
-ort.env.wasm.simd = true;
-ort.env.wasm.wasmPaths = {
-  "ort-wasm.wasm": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort-wasm.wasm",
-  "ort-wasm-simd.wasm": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort-wasm-simd.wasm",
-  "ort-wasm-threaded.wasm": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort-wasm-threaded.wasm",
-  "ort-wasm-simd-threaded.wasm": "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort-wasm-simd-threaded.wasm",
-};
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/";
 
 // ImageNet normalization constants
 const IMAGENET_MEAN = [0.485, 0.456, 0.406];
