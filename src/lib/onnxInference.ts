@@ -199,7 +199,7 @@ export async function analyzeRetinalImage(file: File): Promise<ONNXResult> {
     gradeLabel: gradeInfo.gradeLabel,
     riskLevel: gradeInfo.riskLevel,
     explanation: gradeInfo.explanation,
-    recommendations: gradeInfo.recommendations,
+    recommendations: [...gradeInfo.recommendations],
     probabilities,
   };
 }
