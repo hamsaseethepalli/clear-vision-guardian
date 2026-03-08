@@ -1,6 +1,6 @@
 import * as ort from "onnxruntime-web";
 
-// Configure WASM: use CDN, single thread, no SIMD to maximize compatibility
+// Configure WASM: use CDN, single thread for max compatibility
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/";
 
@@ -54,80 +54,42 @@ export interface ONNXResult {
 
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 
-// Cache model in IndexedDB for instant reloads
-async function getCachedModel(): Promise<ArrayBuffer | null> {
+/**
+ * Clear any corrupted IndexedDB cache
+ */
+async function clearModelCache(): Promise<void> {
   try {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction("models", "readonly");
-      const store = tx.objectStore("models");
-      const req = store.get("retinopathy");
-      req.onsuccess = () => resolve(req.result?.data ?? null);
-      req.onerror = () => resolve(null);
+    const req = indexedDB.deleteDatabase("retino-ai-models");
+    await new Promise<void>((resolve) => {
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
     });
   } catch {
-    return null;
+    // ignore
   }
 }
 
-async function cacheModel(data: ArrayBuffer): Promise<void> {
-  try {
-    const db = await openDB();
-    const tx = db.transaction("models", "readwrite");
-    const store = tx.objectStore("models");
-    store.put({ id: "retinopathy", data });
-  } catch {
-    // Cache failure is non-critical
-  }
-}
-
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open("retino-ai-models", 1);
-    req.onupgradeneeded = () => {
-      req.result.createObjectStore("models", { keyPath: "id" });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
+/**
+ * Load the ONNX session using a direct URL path.
+ * This bypasses ArrayBuffer fetch issues that can corrupt the model.
+ */
 async function loadSession(): Promise<ort.InferenceSession> {
-  // Try cached model first
-  let modelBuffer = await getCachedModel();
+  // Always clear potentially corrupted cache first
+  await clearModelCache();
 
-  // Validate cached model - ONNX files start with magic bytes \x08
-  if (modelBuffer && modelBuffer.byteLength < 1000) {
-    console.warn("Cached ONNX model appears corrupted, re-fetching...");
-    modelBuffer = null;
-    // Clear bad cache
-    try {
-      const db = await openDB();
-      const tx = db.transaction("models", "readwrite");
-      tx.objectStore("models").delete("retinopathy");
-    } catch { /* ignore */ }
-  }
+  // Use direct URL-based loading - onnxruntime-web handles the fetch internally
+  // which avoids issues with Vite transforming or corrupting the binary
+  const modelUrl = `${window.location.origin}/models/retinopathy.onnx`;
+  
+  console.log("Loading ONNX model from:", modelUrl);
 
-  if (!modelBuffer) {
-    const response = await fetch("/models/retinopathy.onnx");
-    if (!response.ok) throw new Error(`Failed to load ONNX model: ${response.status}`);
-    const contentType = response.headers.get("content-type") || "";
-    // If Vite serves it as HTML (e.g. SPA fallback), the model is invalid
-    if (contentType.includes("text/html")) {
-      throw new Error("ONNX model served as HTML - file may be missing from public/models/");
-    }
-    modelBuffer = await response.arrayBuffer();
-    if (modelBuffer.byteLength < 10000) {
-      throw new Error(`ONNX model too small (${modelBuffer.byteLength} bytes) - likely corrupted`);
-    }
-    await cacheModel(modelBuffer);
-  }
-
-  const session = await ort.InferenceSession.create(modelBuffer, {
+  const session = await ort.InferenceSession.create(modelUrl, {
     executionProviders: ["wasm"],
     graphOptimizationLevel: "all",
   });
 
+  console.log("ONNX model loaded successfully. Inputs:", session.inputNames, "Outputs:", session.outputNames);
   return session;
 }
 
@@ -168,9 +130,9 @@ async function preprocessImage(file: File): Promise<ort.Tensor> {
     const b = data[i * 4 + 2] / 255;
 
     // ImageNet normalization + NCHW layout
-    float32Data[i] = (r - IMAGENET_MEAN[0]) / IMAGENET_STD[0];              // R channel
-    float32Data[pixelCount + i] = (g - IMAGENET_MEAN[1]) / IMAGENET_STD[1];  // G channel
-    float32Data[2 * pixelCount + i] = (b - IMAGENET_MEAN[2]) / IMAGENET_STD[2]; // B channel
+    float32Data[i] = (r - IMAGENET_MEAN[0]) / IMAGENET_STD[0];
+    float32Data[pixelCount + i] = (g - IMAGENET_MEAN[1]) / IMAGENET_STD[1];
+    float32Data[2 * pixelCount + i] = (b - IMAGENET_MEAN[2]) / IMAGENET_STD[2];
   }
 
   return new ort.Tensor("float32", float32Data, [1, 3, INPUT_SIZE, INPUT_SIZE]);
@@ -193,7 +155,6 @@ export async function analyzeRetinalImage(file: File): Promise<ONNXResult> {
   const session = await getSession();
   const inputTensor = await preprocessImage(file);
 
-  // Get the input name from the model
   const inputName = session.inputNames[0];
   const feeds: Record<string, ort.Tensor> = { [inputName]: inputTensor };
 
@@ -201,8 +162,11 @@ export async function analyzeRetinalImage(file: File): Promise<ONNXResult> {
   const outputName = session.outputNames[0];
   const outputData = results[outputName].data as Float32Array;
 
+  console.log("ONNX raw output logits:", Array.from(outputData));
+
   // Apply softmax to get probabilities
   const probabilities = softmax(outputData);
+  console.log("ONNX probabilities:", probabilities);
 
   // Get predicted grade (argmax)
   let maxProb = 0;
@@ -216,6 +180,8 @@ export async function analyzeRetinalImage(file: File): Promise<ONNXResult> {
 
   const gradeKey = Math.min(grade, 4) as 0 | 1 | 2 | 3 | 4;
   const gradeInfo = GRADE_DATA[gradeKey];
+
+  console.log(`ONNX predicted grade: ${gradeKey} (${gradeInfo.gradeLabel}) with confidence: ${maxProb}`);
 
   return {
     grade: gradeKey,
