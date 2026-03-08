@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { GradeScale } from "@/components/GradeScale";
 import { Badge } from "@/components/ui/badge";
+import { DoctorAnalytics } from "@/components/DoctorAnalytics";
+import { PatientTimeline } from "@/components/PatientTimeline";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import logo from "@/assets/retino-logo.png";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LogOut, Search, CheckCircle2, XCircle, Clock,
-  FileText, Users, TrendingUp, AlertTriangle,
+  FileText, Users, AlertTriangle, BarChart3, History,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -41,13 +44,14 @@ export default function DoctorDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCase, setSelectedCase] = useState<CaseReport | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending_review' | 'approved' | 'rejected'>('all');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCases();
   }, []);
 
   const fetchCases = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("reports")
       .select(`
         *,
@@ -86,16 +90,38 @@ export default function DoctorDashboard() {
   const pendingCount = cases.filter(c => c.status === 'pending_review').length;
   const approvedCount = cases.filter(c => c.status === 'approved').length;
 
+  // Patient timeline data
+  const selectedPatientReports = useMemo(() => {
+    if (!selectedPatientId) return [];
+    return cases
+      .filter(c => c.patient_id === selectedPatientId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [cases, selectedPatientId]);
+
+  const selectedPatientName = useMemo(() => {
+    if (!selectedPatientId) return "";
+    return cases.find(c => c.patient_id === selectedPatientId)?.patient_name || "Unknown";
+  }, [cases, selectedPatientId]);
+
+  // Unique patients for timeline selection
+  const uniquePatients = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; caseCount: number; lastGrade: number }>();
+    cases.forEach(c => {
+      const existing = map.get(c.patient_id);
+      if (!existing) {
+        map.set(c.patient_id, { id: c.patient_id, name: c.patient_name, caseCount: 1, lastGrade: c.grade });
+      } else {
+        existing.caseCount++;
+      }
+    });
+    return Array.from(map.values());
+  }, [cases]);
+
   const handleDecision = async (reportId: string, decision: 'approved' | 'rejected') => {
     if (!user) return;
-
     const { error } = await supabase
       .from("reports")
-      .update({
-        status: decision,
-        reviewed_by: user.id,
-        reviewed_at: new Date().toISOString(),
-      })
+      .update({ status: decision, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
       .eq("id", reportId);
 
     if (error) {
@@ -103,7 +129,6 @@ export default function DoctorDashboard() {
       return;
     }
 
-    // Audit log
     await supabase.from("audit_logs").insert({
       user_id: user.id,
       action: `report_${decision}`,
@@ -124,10 +149,7 @@ export default function DoctorDashboard() {
     });
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate("/");
-  };
+  const handleLogout = async () => { await signOut(); navigate("/"); };
 
   return (
     <div className="min-h-screen bg-background">
@@ -169,87 +191,158 @@ export default function DoctorDashboard() {
           ))}
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by Patient ID or Name..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-2">
-            {(['all', 'pending_review', 'approved', 'rejected'] as const).map(f => (
-              <Button
-                key={f}
-                variant={filter === f ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter(f)}
-              >
-                {f === 'all' ? 'All' : f === 'pending_review' ? 'Pending' : f.charAt(0).toUpperCase() + f.slice(1)}
-              </Button>
-            ))}
-          </div>
-        </div>
+        {/* Tabs: Cases / Analytics / Patient History */}
+        <Tabs defaultValue="cases" className="space-y-6">
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="cases" className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" /> Cases
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-1.5">
+              <BarChart3 className="h-4 w-4" /> Analytics
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-1.5">
+              <History className="h-4 w-4" /> Patient History
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Cases */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="font-display flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Patient Cases
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-center text-muted-foreground py-8">Loading cases...</p>
-            ) : (
-              <div className="space-y-3">
-                {filteredCases.map(c => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between p-4 rounded-lg border border-border/50 hover:bg-accent/30 cursor-pointer transition-colors"
-                    onClick={() => setSelectedCase(c)}
-                  >
-                    <div>
-                      <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
-                      <p className="text-xs text-muted-foreground">{c.patient_id.slice(0, 8)}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <GradeScale activeGrade={c.grade} compact />
-                      <Badge variant="outline" className={
-                        c.status === 'pending_review' ? "bg-warning/10 text-warning border-warning/20" :
-                        c.status === 'approved' ? "bg-success/10 text-success border-success/20" :
-                        "bg-destructive/10 text-destructive border-destructive/20"
-                      }>
-                        {c.status === 'pending_review' ? 'Pending' : c.status}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground hidden sm:block">
-                        {new Date(c.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
+          {/* Cases Tab */}
+          <TabsContent value="cases" className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search by Patient ID or Name..." className="pl-10" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                {(['all', 'pending_review', 'approved', 'rejected'] as const).map(f => (
+                  <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>
+                    {f === 'all' ? 'All' : f === 'pending_review' ? 'Pending' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </Button>
                 ))}
-                {filteredCases.length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">
-                    {cases.length === 0 ? "No cases yet." : "No cases match your search."}
-                  </p>
+              </div>
+            </div>
+
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="font-display flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" /> Patient Cases
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-center text-muted-foreground py-8">Loading cases...</p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredCases.map(c => (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between p-4 rounded-lg border border-border/50 hover:bg-accent/30 cursor-pointer transition-colors"
+                        onClick={() => setSelectedCase(c)}
+                      >
+                        <div>
+                          <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
+                          <p className="text-xs text-muted-foreground">{c.patient_id.slice(0, 8)}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <GradeScale activeGrade={c.grade} compact />
+                          <Badge variant="outline" className={
+                            c.status === 'pending_review' ? "bg-warning/10 text-warning border-warning/20" :
+                            c.status === 'approved' ? "bg-success/10 text-success border-success/20" :
+                            "bg-destructive/10 text-destructive border-destructive/20"
+                          }>
+                            {c.status === 'pending_review' ? 'Pending' : c.status}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground hidden sm:block">
+                            {new Date(c.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {filteredCases.length === 0 && (
+                      <p className="text-center text-muted-foreground py-8">
+                        {cases.length === 0 ? "No cases yet." : "No cases match your search."}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <DoctorAnalytics cases={cases} />
+          </TabsContent>
+
+          {/* Patient History Tab */}
+          <TabsContent value="history" className="space-y-6">
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Patient List */}
+              <Card className="shadow-card lg:col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="font-display text-sm flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" /> Patients
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {uniquePatients.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No patients yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {uniquePatients.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => setSelectedPatientId(p.id)}
+                          className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                            selectedPatientId === p.id
+                              ? 'border-primary bg-accent'
+                              : 'border-border/50 hover:bg-accent/30'
+                          }`}
+                        >
+                          <p className="font-medium text-sm text-foreground">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {p.caseCount} report{p.caseCount !== 1 ? 's' : ''} · ID: {p.id.slice(0, 8)}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Timeline */}
+              <div className="lg:col-span-2">
+                {selectedPatientId ? (
+                  <PatientTimeline
+                    reports={selectedPatientReports.map(r => ({
+                      id: r.id,
+                      grade: r.grade,
+                      confidence: r.confidence,
+                      grade_label: r.grade_label,
+                      status: r.status,
+                      created_at: r.created_at,
+                      reviewed_at: r.reviewed_at,
+                    }))}
+                    patientName={selectedPatientName}
+                  />
+                ) : (
+                  <Card className="shadow-card">
+                    <CardContent className="py-16 text-center">
+                      <History className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground">Select a patient to view their history timeline.</p>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Decision Dialog */}
       <Dialog open={!!selectedCase} onOpenChange={() => setSelectedCase(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="font-display">
-              Case Review — {selectedCase?.patient_name}
-            </DialogTitle>
+            <DialogTitle className="font-display">Case Review — {selectedCase?.patient_name}</DialogTitle>
           </DialogHeader>
           {selectedCase && (
             <div className="space-y-6">
@@ -260,9 +353,7 @@ export default function DoctorDashboard() {
                 </div>
                 <div className="rounded-lg bg-muted p-3">
                   <p className="text-xs text-muted-foreground">Submitted</p>
-                  <p className="font-medium text-sm text-foreground">
-                    {new Date(selectedCase.created_at).toLocaleString()}
-                  </p>
+                  <p className="font-medium text-sm text-foreground">{new Date(selectedCase.created_at).toLocaleString()}</p>
                 </div>
               </div>
               <GradeScale activeGrade={selectedCase.grade} confidence={selectedCase.confidence} />
