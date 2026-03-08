@@ -126,28 +126,42 @@ export default function PatientDashboard() {
     updateStep(0, "complete");
     updateStep(1, "active");
 
-    // Step 2: AI Analysis via Gemini Vision
+    // Step 2: ONNX Model for accurate grading, then Gemini for explanation
     let result: ONNXResult;
     try {
+      // First: run ONNX model for accurate grade classification
+      const { analyzeRetinalImage } = await import("@/lib/onnxInference");
+      const onnxResult = await analyzeRetinalImage(file);
+      
+      // Then: send image + ONNX grade to Gemini for detailed explanation in user's language
       const imageBase64 = await fileToBase64(file);
       const { data: aiData, error: aiError } = await supabase.functions.invoke("analyze-retina", {
-        body: { imageBase64, language },
+        body: { 
+          imageBase64, 
+          language,
+          onnxGrade: onnxResult.grade,
+          onnxGradeLabel: onnxResult.gradeLabel,
+          onnxRiskLevel: onnxResult.riskLevel,
+        },
       });
 
-      if (aiError) throw new Error(aiError.message);
-      if (aiData?.error) throw new Error(aiData.error);
-
-      result = {
-        grade: aiData.grade as 0|1|2|3|4,
-        confidence: aiData.confidence,
-        gradeLabel: aiData.gradeLabel,
-        riskLevel: aiData.riskLevel,
-        explanation: aiData.explanation,
-        recommendations: aiData.recommendations,
-        probabilities: [0, 1, 2, 3, 4].map(g => g === aiData.grade ? aiData.confidence : (1 - aiData.confidence) / 4),
-      };
+      if (aiError || aiData?.error) {
+        // Fallback: use ONNX result with default explanation
+        result = onnxResult;
+      } else {
+        // Use ONNX grade but Gemini's explanation and recommendations
+        result = {
+          grade: onnxResult.grade,
+          confidence: onnxResult.confidence,
+          gradeLabel: aiData.gradeLabel || onnxResult.gradeLabel,
+          riskLevel: aiData.riskLevel || onnxResult.riskLevel,
+          explanation: aiData.explanation || onnxResult.explanation,
+          recommendations: aiData.recommendations || onnxResult.recommendations,
+          probabilities: onnxResult.probabilities,
+        };
+      }
     } catch (err) {
-      console.error("AI analysis error:", err);
+      console.error("Analysis error:", err);
       toast({ title: "Analysis failed", description: "Could not analyze the image. Please try again.", variant: "destructive" });
       setAnalyzing(false);
       return;
