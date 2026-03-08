@@ -119,7 +119,6 @@ IMPORTANT: You MUST call the analyze_retina tool with ALL required fields filled
                   },
                 },
                 required: ["grade", "confidence", "gradeLabel", "riskLevel", "explanation", "recommendations"],
-                additionalProperties: false,
               },
             },
           },
