@@ -49,14 +49,6 @@ export default function Landing() {
                   <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
                     Start Screening <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
-                    onClick={() => navigate("/login")}
-                  >
-                    Sign In
-                  </Button>
                 </div>
               </div>
               <div className="relative animate-fade-in">
@@ -127,14 +119,41 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 border-t border-border/50 bg-background">
-        <div className="container mx-auto px-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Retino AI" className="h-8 w-auto" />
+      <footer className="py-16 border-t border-border/50 bg-card">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-3 gap-12 mb-12">
+            <div className="space-y-4">
+              <img src={logo} alt="Retino AI" className="h-10 w-auto" />
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Clinical-grade AI screening for diabetic retinopathy. Fast, secure, and physician-verified.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-display font-semibold text-foreground">Platform</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="cursor-pointer hover:text-foreground transition-colors" onClick={() => navigate("/signup")}>Get Started</li>
+                <li className="cursor-pointer hover:text-foreground transition-colors" onClick={() => navigate("/login")}>Sign In</li>
+                <li>AI Screening</li>
+                <li>Doctor Review</li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-display font-semibold text-foreground">Compliance</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><Shield className="h-3.5 w-3.5 text-success" /> HIPAA Compliant</li>
+                <li className="flex items-center gap-2"><Shield className="h-3.5 w-3.5 text-success" /> End-to-End Encryption</li>
+                <li className="flex items-center gap-2"><Shield className="h-3.5 w-3.5 text-success" /> OWASP Top 10 Hardened</li>
+              </ul>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Retino AI. Clinical-grade retinal screening.
-          </p>
+          <div className="border-t border-border/50 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground">
+              &copy; {new Date().getFullYear()} Retino AI. All rights reserved.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              For clinical decision support only. Not a substitute for professional medical advice.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
