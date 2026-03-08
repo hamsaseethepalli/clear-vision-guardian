@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportCard } from "@/components/ReportCard";
 import { GradeScale } from "@/components/GradeScale";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
-import { simulateAIAnalysis, type AIResult } from "@/lib/mockAI";
+import { analyzeRetinalImage, preloadModel, type ONNXResult } from "@/lib/onnxInference";
 import type { Report, AnalysisStep } from "@/lib/types";
 import logo from "@/assets/retino-logo.png";
 import { Upload, LogOut, FileText, Eye, AlertCircle, Download, History } from "lucide-react";
@@ -20,7 +20,7 @@ export default function PatientDashboard() {
   const { user, signOut } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState<AIResult | null>(null);
+  const [aiResult, setAiResult] = useState<ONNXResult | null>(null);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [loadingReports, setLoadingReports] = useState(true);
@@ -29,6 +29,9 @@ export default function PatientDashboard() {
     { label: "Analyzing Retina...", status: "pending" },
     { label: "Generating Report...", status: "pending" },
   ]);
+
+  // Preload ONNX model in background
+  useEffect(() => { preloadModel(); }, []);
 
   // Load reports from database
   useEffect(() => {
@@ -95,8 +98,15 @@ export default function PatientDashboard() {
     updateStep(0, "complete");
     updateStep(1, "active");
 
-    // Step 2: AI Analysis (simulated for now — will use ONNX when model is provided)
-    const result = await simulateAIAnalysis();
+    // Step 2: AI Analysis using ONNX model
+    let result: ONNXResult;
+    try {
+      result = await analyzeRetinalImage(file);
+    } catch (err) {
+      toast({ title: "Analysis failed", description: "AI model could not process this image. Please try again.", variant: "destructive" });
+      setAnalyzing(false);
+      return;
+    }
 
     updateStep(1, "complete");
     updateStep(2, "active");
