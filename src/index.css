@@ -131,3 +131,38 @@
     box-shadow: var(--shadow-glow);
   }
 }
+
+/* High Contrast Mode */
+.high-contrast {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
+  --primary: 220 100% 30%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 0 0% 90%;
+  --muted-foreground: 0 0% 20%;
+  --accent: 220 60% 90%;
+  --accent-foreground: 220 100% 20%;
+  --border: 0 0% 30%;
+  --input: 0 0% 30%;
+}
+
+.high-contrast.dark {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 5%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 50 100% 55%;
+  --primary-foreground: 0 0% 0%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 80%;
+  --accent: 50 60% 15%;
+  --accent-foreground: 50 100% 70%;
+  --border: 0 0% 60%;
+  --input: 0 0% 60%;
+}

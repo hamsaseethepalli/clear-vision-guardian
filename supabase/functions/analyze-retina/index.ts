@@ -53,7 +53,9 @@ Look for these specific features:
 - Neovascularization (new abnormal vessels)
 - Macular edema signs
 
-Base your grade STRICTLY on visible pathological features. If the image quality is poor or it's not a retinal image, indicate that in your explanation.`;
+Base your grade STRICTLY on visible pathological features. If the image quality is poor or it's not a retinal image, indicate that in your explanation.
+
+IMPORTANT: You MUST call the analyze_retina tool with ALL required fields filled in. Do NOT return null values.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -74,7 +76,7 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
               },
               {
                 type: "text",
-                text: `Analyze this retinal fundus image for diabetic retinopathy. Provide a detailed, unique clinical assessment in ${langName}.`,
+                text: `Analyze this retinal fundus image for diabetic retinopathy. You MUST provide a grade (0-4), confidence (0.0-1.0), gradeLabel, riskLevel, explanation, and recommendations. Respond in ${langName}.`,
               },
             ],
           },
@@ -84,7 +86,7 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
             type: "function",
             function: {
               name: "analyze_retina",
-              description: "Return the DR grading analysis result",
+              description: "Return the DR grading analysis result. All fields are required.",
               parameters: {
                 type: "object",
                 properties: {
@@ -108,7 +110,7 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
                   },
                   explanation: {
                     type: "string",
-                    description: "Detailed, unique clinical explanation specific to this image. Mention specific features observed. Written in the requested language.",
+                    description: "Detailed clinical explanation specific to this image in the requested language",
                   },
                   recommendations: {
                     type: "array",
@@ -116,6 +118,8 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
                     description: "3-5 specific clinical recommendations in the requested language",
                   },
                 },
+                required: ["grade", "confidence", "gradeLabel", "riskLevel", "explanation", "recommendations"],
+                additionalProperties: false,
               },
             },
           },
@@ -146,9 +150,12 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
     }
 
     const data = await response.json();
+    console.log("AI response:", JSON.stringify(data));
+    
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (!toolCall?.function?.arguments) {
+      console.error("No tool call in response:", JSON.stringify(data));
       return new Response(JSON.stringify({ error: "AI did not return structured analysis" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -156,8 +163,31 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
     }
 
     const result = JSON.parse(toolCall.function.arguments);
+    console.log("Parsed result:", JSON.stringify(result));
 
-    // Validate and clamp values
+    // Validate all required fields exist and provide defaults if missing
+    if (result.grade === null || result.grade === undefined) {
+      result.grade = 0;
+    }
+    if (result.confidence === null || result.confidence === undefined) {
+      result.confidence = 0.5;
+    }
+    if (!result.gradeLabel) {
+      const defaultLabels = ["No DR", "Mild NPDR", "Moderate NPDR", "Severe NPDR", "Proliferative DR"];
+      result.gradeLabel = defaultLabels[result.grade] || "Unknown";
+    }
+    if (!result.riskLevel) {
+      const defaultRisks = ["Low", "Low-Moderate", "Moderate", "High", "Critical"];
+      result.riskLevel = defaultRisks[result.grade] || "Unknown";
+    }
+    if (!result.explanation) {
+      result.explanation = "Analysis completed. Please consult an ophthalmologist for detailed assessment.";
+    }
+    if (!result.recommendations || result.recommendations.length === 0) {
+      result.recommendations = ["Consult an ophthalmologist for a comprehensive eye examination."];
+    }
+
+    // Clamp values
     result.grade = Math.max(0, Math.min(4, Math.round(result.grade)));
     result.confidence = Math.max(0, Math.min(1, result.confidence));
 
