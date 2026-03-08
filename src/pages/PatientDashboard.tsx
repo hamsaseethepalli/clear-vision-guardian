@@ -22,9 +22,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 
 async function fileToBase64(file: File): Promise<string> {
-  // Resize image to max 1024px to avoid base64 size issues with AI gateway
+  // Resize image to max 512px and compress to avoid payload size issues with AI gateway
   const bitmap = await createImageBitmap(file);
-  const maxDim = 1024;
+  const maxDim = 512;
   let w = bitmap.width;
   let h = bitmap.height;
   if (w > maxDim || h > maxDim) {
@@ -38,7 +38,7 @@ async function fileToBase64(file: File): Promise<string> {
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(bitmap, 0, 0, w, h);
   bitmap.close();
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
   return dataUrl.split(",")[1];
 }
 
