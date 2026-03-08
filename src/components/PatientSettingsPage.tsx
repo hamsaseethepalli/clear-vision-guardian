@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -13,7 +13,7 @@ export function PatientSettingsPage() {
   const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
   const [notifications, setNotifications] = useState(true);
   const [autoAnalyze, setAutoAnalyze] = useState(true);
-  const [highContrast, setHighContrast] = useState(false);
+  const [highContrast, setHighContrast] = useState(() => document.documentElement.classList.contains("high-contrast"));
 
   const toggleDarkMode = (enabled: boolean) => {
     setDarkMode(enabled);
@@ -26,9 +26,28 @@ export function PatientSettingsPage() {
     }
   };
 
+  const toggleHighContrast = (enabled: boolean) => {
+    setHighContrast(enabled);
+    if (enabled) {
+      document.documentElement.classList.add("high-contrast");
+      localStorage.setItem("highContrast", "true");
+    } else {
+      document.documentElement.classList.remove("high-contrast");
+      localStorage.setItem("highContrast", "false");
+    }
+  };
+
+  // Restore high contrast on mount
+  useEffect(() => {
+    if (localStorage.getItem("highContrast") === "true") {
+      document.documentElement.classList.add("high-contrast");
+      setHighContrast(true);
+    }
+  }, []);
+
   const settingsSections = [
     {
-      title: "Appearance",
+      title: t("settings.darkMode"),
       icon: Moon,
       items: [
         {
@@ -39,12 +58,12 @@ export function PatientSettingsPage() {
         {
           label: t("settings.highContrast"),
           description: t("settings.highContrastDesc"),
-          control: <Switch checked={highContrast} onCheckedChange={setHighContrast} />,
+          control: <Switch checked={highContrast} onCheckedChange={toggleHighContrast} />,
         },
       ],
     },
     {
-      title: "Notifications",
+      title: t("settings.notifications"),
       icon: Bell,
       items: [
         {
@@ -55,7 +74,7 @@ export function PatientSettingsPage() {
       ],
     },
     {
-      title: "Analysis",
+      title: t("settings.autoAnalyze"),
       icon: Eye,
       items: [
         {
@@ -66,7 +85,7 @@ export function PatientSettingsPage() {
       ],
     },
     {
-      title: "Language",
+      title: t("settings.language"),
       icon: Globe,
       items: [
         {
@@ -91,7 +110,7 @@ export function PatientSettingsPage() {
       ],
     },
     {
-      title: "Privacy & Security",
+      title: t("settings.encryption"),
       icon: Shield,
       items: [
         {
@@ -129,7 +148,7 @@ export function PatientSettingsPage() {
 
       {settingsSections.map((section, si) => (
         <motion.div
-          key={section.title}
+          key={si}
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: si * 0.08 }}
@@ -143,7 +162,7 @@ export function PatientSettingsPage() {
             </CardHeader>
             <CardContent className="space-y-1">
               {section.items.map((item, ii) => (
-                <div key={item.label}>
+                <div key={ii}>
                   {ii > 0 && <Separator className="my-3" />}
                   <div className="flex items-center justify-between py-2">
                     <div className="space-y-0.5">
