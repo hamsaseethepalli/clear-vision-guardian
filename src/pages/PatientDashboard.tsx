@@ -301,23 +301,108 @@ export default function PatientDashboard() {
         <h1 className="font-display text-2xl font-bold text-foreground">{t("education.title")}</h1>
         <p className="text-muted-foreground text-sm mt-1">{t("education.subtitle")}</p>
       </div>
-      {[
-        { title: t("education.whatIsDR"), content: t("education.whatIsDRDesc"), color: "from-primary/10 to-accent" },
-        { title: t("education.grades"), content: t("education.gradesDesc"), color: "from-warning/10 to-accent" },
-        { title: t("education.prevention"), content: t("education.preventionDesc"), color: "from-success/10 to-accent" },
-        { title: t("education.whenToSee"), content: t("education.whenToSeeDesc"), color: "from-destructive/10 to-accent" },
-      ].map((card, i) => (
-        <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ y: -2 }}>
-          <Card className={`shadow-card bg-gradient-to-br ${card.color}`}>
-            <CardHeader>
-              <CardTitle className="font-display text-base text-foreground">{card.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-foreground/80 leading-relaxed">{card.content}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
+
+      {/* What is DR - detailed */}
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} whileHover={{ y: -2 }}>
+        <Card className="shadow-card bg-gradient-to-br from-primary/10 to-accent">
+          <CardHeader>
+            <CardTitle className="font-display text-base text-foreground flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              {t("education.whatIsDR")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-foreground/80 leading-relaxed">{t("education.whatIsDRDesc")}</p>
+            <div className="rounded-lg bg-card/60 p-4 space-y-2">
+              <p className="text-sm font-medium text-foreground">{t("education.howItDevelops")}</p>
+              <ul className="space-y-1.5">
+                {["education.develop1", "education.develop2", "education.develop3", "education.develop4"].map((key, i) => (
+                  <li key={i} className="text-sm text-foreground/70 flex items-start gap-2">
+                    <span className="text-primary font-bold mt-0.5">{i + 1}.</span> {t(key)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-lg bg-card/60 p-4">
+              <p className="text-sm font-medium text-foreground mb-2">{t("education.riskFactors")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {["education.risk1", "education.risk2", "education.risk3", "education.risk4", "education.risk5", "education.risk6"].map((key, i) => (
+                  <p key={i} className="text-sm text-foreground/70 flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-warning" /> {t(key)}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* DR Grades - detailed */}
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} whileHover={{ y: -2 }}>
+        <Card className="shadow-card bg-gradient-to-br from-warning/10 to-accent">
+          <CardHeader>
+            <CardTitle className="font-display text-base text-foreground">{t("education.grades")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              { grade: "0", color: "bg-success", label: t("education.grade0"), desc: t("education.grade0Desc") },
+              { grade: "1", color: "bg-[hsl(var(--grade-1))]", label: t("education.grade1"), desc: t("education.grade1Desc") },
+              { grade: "2", color: "bg-warning", label: t("education.grade2"), desc: t("education.grade2Desc") },
+              { grade: "3", color: "bg-[hsl(var(--grade-3))]", label: t("education.grade3"), desc: t("education.grade3Desc") },
+              { grade: "4", color: "bg-destructive", label: t("education.grade4"), desc: t("education.grade4Desc") },
+            ].map((g, i) => (
+              <div key={i} className="rounded-lg bg-card/60 p-3 flex items-start gap-3">
+                <div className={`h-8 w-8 rounded-full ${g.color} flex items-center justify-center text-sm font-bold text-primary-foreground flex-shrink-0`}>
+                  {g.grade}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{g.label}</p>
+                  <p className="text-xs text-foreground/70 mt-0.5">{g.desc}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Prevention - detailed */}
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} whileHover={{ y: -2 }}>
+        <Card className="shadow-card bg-gradient-to-br from-success/10 to-accent">
+          <CardHeader>
+            <CardTitle className="font-display text-base text-foreground">{t("education.prevention")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {["education.prev1", "education.prev2", "education.prev3", "education.prev4", "education.prev5"].map((key, i) => (
+              <div key={i} className="rounded-lg bg-card/60 p-3 flex items-start gap-3">
+                <span className="text-success font-bold text-lg">✓</span>
+                <p className="text-sm text-foreground/80">{t(key)}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* When to see doctor */}
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} whileHover={{ y: -2 }}>
+        <Card className="shadow-card bg-gradient-to-br from-destructive/10 to-accent border-destructive/20">
+          <CardHeader>
+            <CardTitle className="font-display text-base text-foreground">{t("education.whenToSee")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-foreground/80 leading-relaxed">{t("education.whenToSeeDesc")}</p>
+            <div className="rounded-lg bg-card/60 p-4">
+              <p className="text-sm font-medium text-foreground mb-2">{t("education.screeningSchedule")}</p>
+              <ul className="space-y-1.5">
+                {["education.schedule1", "education.schedule2", "education.schedule3"].map((key, i) => (
+                  <li key={i} className="text-sm text-foreground/70 flex items-start gap-2">
+                    <span className="text-destructive mt-0.5 font-bold">•</span> {t(key)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </motion.div>
   );
 
