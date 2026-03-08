@@ -30,6 +30,9 @@ export default function PatientDashboard() {
     { label: "Generating Report...", status: "pending" },
   ]);
 
+  // Preload ONNX model in background
+  useEffect(() => { preloadModel(); }, []);
+
   // Load reports from database
   useEffect(() => {
     if (!user) return;
