@@ -22,15 +22,24 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 
 async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(",")[1]); // strip data:... prefix
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  // Resize image to max 1024px to avoid base64 size issues with AI gateway
+  const bitmap = await createImageBitmap(file);
+  const maxDim = 1024;
+  let w = bitmap.width;
+  let h = bitmap.height;
+  if (w > maxDim || h > maxDim) {
+    const scale = maxDim / Math.max(w, h);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  return dataUrl.split(",")[1];
 }
 
 export default function PatientDashboard() {
