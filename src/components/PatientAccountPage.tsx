@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/hooks/useI18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { User, Mail, Phone, Save, Loader2, KeyRound } from "lucide-react";
 
 export function PatientAccountPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const { toast } = useToast();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -50,13 +52,13 @@ export function PatientAccountPage() {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Profile updated", description: "Your changes have been saved." });
+      toast({ title: t("account.profileUpdated"), description: t("account.savedDesc") });
     }
   };
 
   const initials = user?.email?.slice(0, 2).toUpperCase() || "U";
 
-  if (loading) return <p className="text-muted-foreground text-center py-12">Loading...</p>;
+  if (loading) return <p className="text-muted-foreground text-center py-12">{t("common.loading")}</p>;
 
   return (
     <motion.div
@@ -65,8 +67,8 @@ export function PatientAccountPage() {
       className="max-w-2xl mx-auto space-y-6"
     >
       <div>
-        <h1 className="font-display text-2xl font-bold text-foreground">My Account</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage your profile and account details</p>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("account.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("account.subtitle")}</p>
       </div>
 
       {/* Avatar Card */}
@@ -98,29 +100,29 @@ export function PatientAccountPage() {
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle className="font-display text-base flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" /> Personal Information
+              <User className="h-5 w-5 text-primary" /> {t("account.personalInfo")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">{t("account.firstName")}</Label>
                 <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">{t("account.lastName")}</Label>
                 <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("account.email")}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input id="email" value={user?.email || ""} disabled className="pl-10 opacity-60" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">{t("account.phone")}</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91..." className="pl-10" />
@@ -128,7 +130,7 @@ export function PatientAccountPage() {
             </div>
             <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Changes
+              {t("account.save")}
             </Button>
           </CardContent>
         </Card>

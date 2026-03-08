@@ -1,36 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Settings, Moon, Bell, Globe, Shield, Eye } from "lucide-react";
+import { useI18n, type Language } from "@/hooks/useI18n";
+import { Moon, Bell, Globe, Shield, Eye } from "lucide-react";
 
 export function PatientSettingsPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const { t, language, setLanguage } = useI18n();
   const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
   const [notifications, setNotifications] = useState(true);
-  const [language, setLanguage] = useState("en");
   const [autoAnalyze, setAutoAnalyze] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
-
-  // Load language preference from profile
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("profiles")
-      .select("language_preference")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.language_preference) setLanguage(data.language_preference);
-      });
-  }, [user]);
 
   const toggleDarkMode = (enabled: boolean) => {
     setDarkMode(enabled);
@@ -43,30 +26,19 @@ export function PatientSettingsPage() {
     }
   };
 
-  const handleLanguageChange = async (lang: string) => {
-    setLanguage(lang);
-    if (user) {
-      await supabase
-        .from("profiles")
-        .update({ language_preference: lang })
-        .eq("user_id", user.id);
-      toast({ title: "Language updated", description: "Your language preference has been saved." });
-    }
-  };
-
   const settingsSections = [
     {
       title: "Appearance",
       icon: Moon,
       items: [
         {
-          label: "Dark Mode",
-          description: "Switch between light and dark theme",
+          label: t("settings.darkMode"),
+          description: t("settings.darkModeDesc"),
           control: <Switch checked={darkMode} onCheckedChange={toggleDarkMode} />,
         },
         {
-          label: "High Contrast",
-          description: "Increase contrast for better readability",
+          label: t("settings.highContrast"),
+          description: t("settings.highContrastDesc"),
           control: <Switch checked={highContrast} onCheckedChange={setHighContrast} />,
         },
       ],
@@ -76,8 +48,8 @@ export function PatientSettingsPage() {
       icon: Bell,
       items: [
         {
-          label: "Report Updates",
-          description: "Get notified when a doctor reviews your report",
+          label: t("settings.notifications"),
+          description: t("settings.notificationsDesc"),
           control: <Switch checked={notifications} onCheckedChange={setNotifications} />,
         },
       ],
@@ -87,8 +59,8 @@ export function PatientSettingsPage() {
       icon: Eye,
       items: [
         {
-          label: "Auto-Analyze on Upload",
-          description: "Automatically start AI analysis when an image is uploaded",
+          label: t("settings.autoAnalyze"),
+          description: t("settings.autoAnalyzeDesc"),
           control: <Switch checked={autoAnalyze} onCheckedChange={setAutoAnalyze} />,
         },
       ],
@@ -98,10 +70,10 @@ export function PatientSettingsPage() {
       icon: Globe,
       items: [
         {
-          label: "Display Language",
-          description: "Choose your preferred language",
+          label: t("settings.language"),
+          description: t("settings.languageDesc"),
           control: (
-            <Select value={language} onValueChange={handleLanguageChange}>
+            <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
               </SelectTrigger>
@@ -111,6 +83,7 @@ export function PatientSettingsPage() {
                 <SelectItem value="ta">தமிழ்</SelectItem>
                 <SelectItem value="te">తెలుగు</SelectItem>
                 <SelectItem value="kn">ಕನ್ನಡ</SelectItem>
+                <SelectItem value="ml">മലയാളം</SelectItem>
               </SelectContent>
             </Select>
           ),
@@ -122,8 +95,8 @@ export function PatientSettingsPage() {
       icon: Shield,
       items: [
         {
-          label: "Data Encryption",
-          description: "All your medical data is encrypted end-to-end",
+          label: t("settings.encryption"),
+          description: t("settings.encryptionDesc"),
           control: (
             <span className="text-xs px-2 py-1 rounded-full bg-success/10 text-success font-medium">
               Active
@@ -131,8 +104,8 @@ export function PatientSettingsPage() {
           ),
         },
         {
-          label: "HIPAA Compliance",
-          description: "Your data is handled in compliance with HIPAA regulations",
+          label: t("settings.hipaa"),
+          description: t("settings.hipaaDesc"),
           control: (
             <span className="text-xs px-2 py-1 rounded-full bg-success/10 text-success font-medium">
               Compliant
@@ -150,8 +123,8 @@ export function PatientSettingsPage() {
       className="max-w-2xl mx-auto space-y-6"
     >
       <div>
-        <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Customize your experience</p>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("settings.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("settings.subtitle")}</p>
       </div>
 
       {settingsSections.map((section, si) => (
