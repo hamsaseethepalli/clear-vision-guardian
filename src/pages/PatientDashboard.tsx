@@ -113,13 +113,9 @@ export default function PatientDashboard() {
     try {
       result = await analyzeRetinalImage(file);
     } catch {
-      // ONNX failed, use mock AI as fallback
-      console.warn("ONNX model unavailable, using fallback analysis");
-      const mockResult = await simulateAIAnalysis();
-      result = {
-        ...mockResult,
-        probabilities: [0, 0, 0, 0, 0].map((_, i) => i === mockResult.grade ? mockResult.confidence : (1 - mockResult.confidence) / 4),
-      };
+      // ONNX failed, use image-aware fallback analysis
+      console.warn("ONNX model unavailable, using image-based fallback analysis");
+      result = await analyzeImageFallback(file);
     }
 
     updateStep(1, "complete");
