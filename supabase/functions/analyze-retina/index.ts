@@ -117,7 +117,6 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
                   },
                 },
                 required: ["grade", "confidence", "gradeLabel", "riskLevel", "explanation", "recommendations"],
-                additionalProperties: false,
               },
             },
           },
