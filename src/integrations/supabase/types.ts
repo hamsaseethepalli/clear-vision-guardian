@@ -89,12 +89,37 @@ export type Database = {
         }
         Relationships: []
       }
+      hospitals: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
           email: string | null
           first_name: string
+          hospital_id: string | null
           id: string
           language_preference: string | null
           last_name: string
@@ -107,6 +132,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           first_name?: string
+          hospital_id?: string | null
           id?: string
           language_preference?: string | null
           last_name?: string
@@ -119,6 +145,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           first_name?: string
+          hospital_id?: string | null
           id?: string
           language_preference?: string | null
           last_name?: string
@@ -126,7 +153,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reports: {
         Row: {
@@ -136,10 +171,12 @@ export type Database = {
           explanation: string
           grade: number
           grade_label: string
+          hospital_id: string | null
           id: string
           image_path: string
           patient_id: string
           recommendations: string[]
+          requested_doctor_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           risk_level: string
@@ -153,10 +190,12 @@ export type Database = {
           explanation: string
           grade: number
           grade_label: string
+          hospital_id?: string | null
           id?: string
           image_path: string
           patient_id: string
           recommendations?: string[]
+          requested_doctor_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           risk_level: string
@@ -170,17 +209,27 @@ export type Database = {
           explanation?: string
           grade?: number
           grade_label?: string
+          hospital_id?: string | null
           id?: string
           image_path?: string
           patient_id?: string
           recommendations?: string[]
+          requested_doctor_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           risk_level?: string
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_hospital_id_fkey"
+            columns: ["hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
