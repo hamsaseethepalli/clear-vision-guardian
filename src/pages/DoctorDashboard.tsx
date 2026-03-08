@@ -14,9 +14,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LogOut, Search, CheckCircle2, XCircle, Clock,
-  FileText, Users, AlertTriangle, BarChart3, History,
+  FileText, Users, AlertTriangle, BarChart3, History, Bell,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface CaseReport {
   id: string;
@@ -33,6 +34,7 @@ interface CaseReport {
   created_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  requested_doctor_id: string | null;
 }
 
 export default function DoctorDashboard() {
@@ -75,10 +77,17 @@ export default function DoctorDashboard() {
         created_at: r.created_at,
         reviewed_at: r.reviewed_at,
         reviewed_by: r.reviewed_by,
+        requested_doctor_id: r.requested_doctor_id,
       })));
     }
     setLoading(false);
   };
+
+  // Requests specifically for this doctor
+  const myRequests = useMemo(() => {
+    if (!user) return [];
+    return cases.filter(c => c.requested_doctor_id === user.id && c.status === 'pending_review');
+  }, [cases, user]);
 
   const filteredCases = cases.filter(c => {
     const matchesSearch = c.patient_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -90,7 +99,6 @@ export default function DoctorDashboard() {
   const pendingCount = cases.filter(c => c.status === 'pending_review').length;
   const approvedCount = cases.filter(c => c.status === 'approved').length;
 
-  // Patient timeline data
   const selectedPatientReports = useMemo(() => {
     if (!selectedPatientId) return [];
     return cases
@@ -103,7 +111,6 @@ export default function DoctorDashboard() {
     return cases.find(c => c.patient_id === selectedPatientId)?.patient_name || "Unknown";
   }, [cases, selectedPatientId]);
 
-  // Unique patients for timeline selection
   const uniquePatients = useMemo(() => {
     const map = new Map<string, { id: string; name: string; caseCount: number; lastGrade: number }>();
     cases.forEach(c => {
@@ -160,6 +167,11 @@ export default function DoctorDashboard() {
             <span className="font-display font-bold text-foreground">Doctor Console</span>
           </div>
           <div className="flex items-center gap-3">
+            {myRequests.length > 0 && (
+              <Badge className="bg-destructive text-destructive-foreground animate-pulse">
+                <Bell className="h-3 w-3 mr-1" /> {myRequests.length} request{myRequests.length > 1 ? 's' : ''}
+              </Badge>
+            )}
             <span className="text-sm text-muted-foreground hidden sm:block">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" /> Logout
@@ -170,32 +182,54 @@ export default function DoctorDashboard() {
 
       <main className="container mx-auto px-4 py-8 space-y-8">
         {/* Stats */}
-        <div className="grid sm:grid-cols-4 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid sm:grid-cols-4 gap-4"
+        >
           {[
             { label: "Pending Review", value: pendingCount, icon: Clock, color: "text-warning" },
             { label: "Approved", value: approvedCount, icon: CheckCircle2, color: "text-success" },
             { label: "Total Cases", value: cases.length, icon: Users, color: "text-info" },
-            { label: "High Risk", value: cases.filter(c => c.grade >= 3).length, icon: AlertTriangle, color: "text-destructive" },
+            { label: "My Requests", value: myRequests.length, icon: Bell, color: "text-destructive" },
           ].map((stat, i) => (
-            <Card key={i} className="shadow-card">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-3">
-                  <stat.icon className={`h-8 w-8 ${stat.color}`} />
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              whileHover={{ scale: 1.03, y: -2 }}
+            >
+              <Card className="shadow-card hover:shadow-elevated transition-shadow">
+                <CardContent className="py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center">
+                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
-        {/* Tabs: Cases / Analytics / Patient History */}
-        <Tabs defaultValue="cases" className="space-y-6">
+        {/* Tabs */}
+        <Tabs defaultValue="requests" className="space-y-6">
           <TabsList className="bg-muted/50">
+            <TabsTrigger value="requests" className="flex items-center gap-1.5">
+              <Bell className="h-4 w-4" /> Requests
+              {myRequests.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-destructive text-destructive-foreground">
+                  {myRequests.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="cases" className="flex items-center gap-1.5">
-              <FileText className="h-4 w-4" /> Cases
+              <FileText className="h-4 w-4" /> All Cases
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-1.5">
               <BarChart3 className="h-4 w-4" /> Analytics
@@ -204,6 +238,56 @@ export default function DoctorDashboard() {
               <History className="h-4 w-4" /> Patient History
             </TabsTrigger>
           </TabsList>
+
+          {/* Requests Tab */}
+          <TabsContent value="requests" className="space-y-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <Card className="shadow-card">
+                <CardHeader>
+                  <CardTitle className="font-display flex items-center gap-2">
+                    <Bell className="h-5 w-5 text-primary" /> Verification Requests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <p className="text-center text-muted-foreground py-8">Loading...</p>
+                  ) : myRequests.length === 0 ? (
+                    <div className="text-center py-12">
+                      <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" />
+                      <p className="text-muted-foreground">No pending verification requests</p>
+                      <p className="text-xs text-muted-foreground mt-1">All caught up! Check the "All Cases" tab for other pending reports.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {myRequests.map((c, i) => (
+                        <motion.div
+                          key={c.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          className="flex items-center justify-between p-4 rounded-xl border-2 border-primary/20 bg-accent/30 hover:bg-accent/50 cursor-pointer transition-all"
+                          onClick={() => setSelectedCase(c)}
+                        >
+                          <div>
+                            <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(c.created_at).toLocaleDateString()} · Specifically requested you
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <GradeScale activeGrade={c.grade} compact />
+                            <Badge className="bg-primary/10 text-primary border-primary/20">
+                              Review Now
+                            </Badge>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
 
           {/* Cases Tab */}
           <TabsContent value="cases" className="space-y-6">
@@ -232,9 +316,12 @@ export default function DoctorDashboard() {
                   <p className="text-center text-muted-foreground py-8">Loading cases...</p>
                 ) : (
                   <div className="space-y-3">
-                    {filteredCases.map(c => (
-                      <div
+                    {filteredCases.map((c, i) => (
+                      <motion.div
                         key={c.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: i * 0.03 }}
                         className="flex items-center justify-between p-4 rounded-lg border border-border/50 hover:bg-accent/30 cursor-pointer transition-colors"
                         onClick={() => setSelectedCase(c)}
                       >
@@ -255,7 +342,7 @@ export default function DoctorDashboard() {
                             {new Date(c.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                     {filteredCases.length === 0 && (
                       <p className="text-center text-muted-foreground py-8">
@@ -276,7 +363,6 @@ export default function DoctorDashboard() {
           {/* Patient History Tab */}
           <TabsContent value="history" className="space-y-6">
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Patient List */}
               <Card className="shadow-card lg:col-span-1">
                 <CardHeader className="pb-3">
                   <CardTitle className="font-display text-sm flex items-center gap-2">
@@ -309,7 +395,6 @@ export default function DoctorDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Timeline */}
               <div className="lg:col-span-2">
                 {selectedPatientId ? (
                   <PatientTimeline
@@ -345,7 +430,14 @@ export default function DoctorDashboard() {
             <DialogTitle className="font-display">Case Review — {selectedCase?.patient_name}</DialogTitle>
           </DialogHeader>
           {selectedCase && (
-            <div className="space-y-6">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              {selectedCase.requested_doctor_id === user?.id && (
+                <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                  <p className="text-sm text-foreground font-medium">
+                    ⚡ This patient specifically requested your review
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg bg-muted p-3">
                   <p className="text-xs text-muted-foreground">Patient ID</p>
@@ -395,7 +487,7 @@ export default function DoctorDashboard() {
                   </p>
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
         </DialogContent>
       </Dialog>
