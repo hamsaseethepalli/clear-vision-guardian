@@ -22,11 +22,6 @@ export function GradeScale({ activeGrade, confidence, compact = false }: GradeSc
         <h4 className="font-display font-semibold text-foreground text-sm">
           Clinical Grading Scale
         </h4>
-        {confidence !== undefined && (
-          <span className="text-xs font-medium text-muted-foreground">
-            Confidence: {Math.round(confidence * 100)}%
-          </span>
-        )}
       </div>
       <div className="flex gap-1">
         {GRADE_LABELS.map((label, i) => (

@@ -578,15 +578,9 @@ export default function PatientDashboard() {
             </CardHeader>
             <CardContent className="space-y-6">
               <GradeScale activeGrade={aiResult.grade} confidence={aiResult.confidence} />
-              <div className="grid sm:grid-cols-2 gap-4">
-                <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg bg-muted p-4">
-                  <p className="text-xs text-muted-foreground mb-1">{t("scan.riskLevel")}</p>
-                  <p className="font-semibold text-foreground">{aiResult.riskLevel}</p>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg bg-muted p-4">
-                  <p className="text-xs text-muted-foreground mb-1">{t("scan.confidence")}</p>
-                  <p className="font-semibold text-foreground">{Math.round(aiResult.confidence * 100)}%</p>
-                </motion.div>
+              <div className="rounded-lg bg-muted p-4">
+                <p className="text-xs text-muted-foreground mb-1">{t("scan.riskLevel")}</p>
+                <p className="font-semibold text-foreground">{aiResult.riskLevel}</p>
               </div>
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs text-muted-foreground mb-2">{t("scan.explanation")}</p>

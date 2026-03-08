@@ -65,6 +65,7 @@ IMPORTANT: You MUST call the analyze_retina tool with ALL required fields filled
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-pro",
+        temperature: 0.2,
         messages: [
           { role: "system", content: systemPrompt },
           {
