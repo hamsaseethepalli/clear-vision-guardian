@@ -116,7 +116,6 @@ Base your grade STRICTLY on visible pathological features. If the image quality 
                     description: "3-5 specific clinical recommendations in the requested language",
                   },
                 },
-                required: ["grade", "confidence", "gradeLabel", "riskLevel", "explanation", "recommendations"],
               },
             },
           },
