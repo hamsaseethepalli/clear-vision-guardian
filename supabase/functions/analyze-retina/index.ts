@@ -52,7 +52,7 @@ IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null valu
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         temperature: 0.2,
         messages: [
           { role: "system", content: systemPrompt },
