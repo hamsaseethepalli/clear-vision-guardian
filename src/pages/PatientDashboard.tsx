@@ -598,7 +598,7 @@ export default function PatientDashboard() {
                 <p className="text-sm text-foreground">{selectedReport.explanation}</p>
               </div>
               <div className="rounded-lg bg-muted p-4">
-                <p className="text-xs text-muted-foreground mb-1">Status</p>
+                <p className="text-xs text-muted-foreground mb-1">{t("common.status")}</p>
                 <p className="text-sm text-foreground capitalize">{selectedReport.status.replace('_', ' ')}</p>
               </div>
               {selectedReport.status === 'approved' && (
@@ -608,7 +608,7 @@ export default function PatientDashboard() {
               )}
               {selectedReport.status === 'rejected' && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-foreground">
-                  This report requires re-evaluation. Please upload a new retinal image.
+                  {t("report.rejectedMsg")}
                 </div>
               )}
             </div>
