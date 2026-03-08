@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { imageBase64, language } = await req.json();
+    const { imageBase64, language, onnxGrade, onnxGradeLabel, onnxRiskLevel } = await req.json();
 
     if (!imageBase64) {
       return new Response(JSON.stringify({ error: "No image provided" }), {
