@@ -12,6 +12,7 @@ import { PatientSidebar } from "@/components/PatientSidebar";
 import type { ONNXResult } from "@/lib/onnxInference";
 import type { Report, AnalysisStep } from "@/lib/types";
 import { Upload, FileText, Eye, AlertCircle, Download, History, BookOpen, Phone, HelpCircle, Bell } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/hooks/useI18n";
@@ -360,29 +361,39 @@ export default function PatientDashboard() {
     </motion.div>
   );
 
+  const faqItems = [
+    { q: t("faq.q1"), a: t("faq.a1") },
+    { q: t("faq.q2"), a: t("faq.a2") },
+    { q: t("faq.q3"), a: t("faq.a3") },
+    { q: t("faq.q4"), a: t("faq.a4") },
+    { q: t("faq.q5"), a: t("faq.a5") },
+    { q: t("faq.q6"), a: t("faq.a6") },
+    { q: t("faq.q7"), a: t("faq.a7") },
+    { q: t("faq.q8"), a: t("faq.a8") },
+  ];
+
   const renderHelpView = () => (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-foreground">{t("help.title")}</h1>
         <p className="text-muted-foreground text-sm mt-1">{t("help.subtitle")}</p>
       </div>
-      {[
-        { q: "How do I upload a retinal image?", a: "Go to 'New Scan' in the sidebar, optionally select a hospital and doctor, then click 'Choose Image' to upload a retinal fundus photograph." },
-        { q: "How accurate is the AI analysis?", a: "Our AI uses Gemini Vision to analyze retinal images. While highly accurate, all results must be verified by a qualified ophthalmologist before clinical decisions are made." },
-        { q: "How long does analysis take?", a: "Typically 10-30 seconds depending on image size and server load." },
-        { q: "Can I choose which doctor reviews my report?", a: "Yes! Go to 'Find Doctors' to select a hospital and specific doctor. Your next scan will be sent to them for verification." },
-        { q: "When can I download my report?", a: "Reports can be downloaded after a doctor approves them. You'll receive a notification when this happens." },
-        { q: "Is my data secure?", a: "Yes. All medical data is encrypted end-to-end, and we comply with HIPAA regulations. Your retinal images are stored securely and only accessible to you and your assigned doctor." },
-      ].map((faq, i) => (
-        <motion.div key={faq.q} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-          <Card className="shadow-card">
-            <CardContent className="py-4">
-              <p className="font-medium text-sm text-foreground mb-2">{faq.q}</p>
-              <p className="text-sm text-muted-foreground">{faq.a}</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
+      <Card className="shadow-card">
+        <CardContent className="py-2">
+          <Accordion type="single" collapsible className="w-full">
+            {faqItems.map((faq, i) => (
+              <AccordionItem key={i} value={`faq-${i}`}>
+                <AccordionTrigger className="text-sm text-foreground hover:no-underline">
+                  {faq.q}
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  {faq.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 
