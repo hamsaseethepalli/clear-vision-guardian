@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportCard } from "@/components/ReportCard";
 import { GradeScale } from "@/components/GradeScale";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
-import { simulateAIAnalysis, type AIResult } from "@/lib/mockAI";
+import { analyzeRetinalImage, preloadModel, type ONNXResult } from "@/lib/onnxInference";
 import type { Report, AnalysisStep } from "@/lib/types";
 import logo from "@/assets/retino-logo.png";
 import { Upload, LogOut, FileText, Eye, AlertCircle, Download, History } from "lucide-react";
