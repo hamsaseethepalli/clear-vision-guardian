@@ -302,12 +302,12 @@ export default function PatientDashboard() {
         <p className="text-muted-foreground text-sm mt-1">{t("education.subtitle")}</p>
       </div>
       {[
-        { title: "What is Diabetic Retinopathy?", content: "Diabetic retinopathy (DR) is a diabetes complication that affects the eyes. It's caused by damage to the blood vessels of the light-sensitive tissue at the back of the eye (retina). It can develop in anyone who has type 1 or type 2 diabetes.", color: "from-primary/10 to-accent" },
-        { title: "Understanding the Grades", content: "Grade 0: No DR — Normal retina. Grade 1: Mild NPDR — Microaneurysms only. Grade 2: Moderate NPDR — More than just microaneurysms. Grade 3: Severe NPDR — Many hemorrhages and abnormalities. Grade 4: Proliferative DR — New blood vessel growth, most severe.", color: "from-warning/10 to-accent" },
-        { title: "Prevention Tips", content: "Control blood sugar levels, maintain healthy blood pressure, get regular eye exams, exercise regularly, avoid smoking, and maintain a healthy diet rich in omega-3 fatty acids and antioxidants.", color: "from-success/10 to-accent" },
-        { title: "When to See a Doctor", content: "See an ophthalmologist immediately if you experience: sudden vision changes, floaters, blurred vision, dark areas in your vision, or difficulty perceiving colors. Early detection is key to preventing vision loss.", color: "from-destructive/10 to-accent" },
+        { title: t("education.whatIsDR"), content: t("education.whatIsDRDesc"), color: "from-primary/10 to-accent" },
+        { title: t("education.grades"), content: t("education.gradesDesc"), color: "from-warning/10 to-accent" },
+        { title: t("education.prevention"), content: t("education.preventionDesc"), color: "from-success/10 to-accent" },
+        { title: t("education.whenToSee"), content: t("education.whenToSeeDesc"), color: "from-destructive/10 to-accent" },
       ].map((card, i) => (
-        <motion.div key={card.title} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ y: -2 }}>
+        <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ y: -2 }}>
           <Card className={`shadow-card bg-gradient-to-br ${card.color}`}>
             <CardHeader>
               <CardTitle className="font-display text-base text-foreground">{card.title}</CardTitle>
