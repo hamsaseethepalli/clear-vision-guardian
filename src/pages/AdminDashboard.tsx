@@ -1,36 +1,96 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import logo from "@/assets/retino-logo.png";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Shield, CheckCircle2, XCircle, Users, FileCheck, Clock } from "lucide-react";
 
 interface DoctorApplication {
   id: string;
+  user_id: string;
   name: string;
   email: string;
-  license: string;
+  license_number: string;
   specialization: string;
-  status: 'pending' | 'approved' | 'rejected';
-  submittedAt: string;
+  status: string;
+  created_at: string;
 }
-
-const MOCK_APPLICATIONS: DoctorApplication[] = [
-  { id: "d-001", name: "Dr. Anjali Gupta", email: "anjali@clinic.com", license: "MCI-78901", specialization: "Ophthalmology", status: "pending", submittedAt: "2026-03-07" },
-  { id: "d-002", name: "Dr. Ravi Kumar", email: "ravi@hospital.com", license: "MCI-45678", specialization: "Retinal Surgery", status: "pending", submittedAt: "2026-03-06" },
-  { id: "d-003", name: "Dr. Meera Shah", email: "meera@eye.com", license: "MCI-12345", specialization: "Ophthalmology", status: "approved", submittedAt: "2026-03-01" },
-];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [applications, setApplications] = useState(MOCK_APPLICATIONS);
+  const { user, signOut } = useAuth();
+  const [applications, setApplications] = useState<DoctorApplication[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleDecision = (id: string, decision: 'approved' | 'rejected') => {
+  useEffect(() => {
+    fetchApplications();
+  }, []);
+
+  const fetchApplications = async () => {
+    const { data } = await supabase
+      .from("doctor_applications")
+      .select(`
+        *,
+        profiles:user_id(first_name, last_name, email)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (data) {
+      setApplications(data.map((a: any) => ({
+        id: a.id,
+        user_id: a.user_id,
+        name: a.profiles ? `Dr. ${a.profiles.first_name} ${a.profiles.last_name}` : "Unknown",
+        email: a.profiles?.email || "",
+        license_number: a.license_number,
+        specialization: a.specialization,
+        status: a.status,
+        created_at: a.created_at,
+      })));
+    }
+    setLoading(false);
+  };
+
+  const handleDecision = async (appId: string, userId: string, decision: 'approved' | 'rejected') => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("doctor_applications")
+      .update({
+        status: decision,
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", appId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    // If approved, grant doctor role
+    if (decision === 'approved') {
+      await supabase.from("user_roles").insert({
+        user_id: userId,
+        role: 'doctor' as any,
+      });
+    }
+
+    // Audit log
+    await supabase.from("audit_logs").insert({
+      user_id: user.id,
+      action: `doctor_${decision}`,
+      entity_type: "doctor_application",
+      entity_id: appId,
+      details: { decision },
+    });
+
     setApplications(prev => prev.map(a =>
-      a.id === id ? { ...a, status: decision } : a
+      a.id === appId ? { ...a, status: decision } : a
     ));
     toast({
       title: decision === 'approved' ? "Doctor Approved" : "Doctor Rejected",
@@ -39,6 +99,10 @@ export default function AdminDashboard() {
   };
 
   const pendingCount = applications.filter(a => a.status === 'pending').length;
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,14 +112,13 @@ export default function AdminDashboard() {
             <img src={logo} alt="Retino AI" className="h-8 w-8" />
             <span className="font-display font-bold text-foreground">Admin Panel</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" /> Logout
           </Button>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Stats */}
         <div className="grid sm:grid-cols-3 gap-4">
           <Card className="shadow-card">
             <CardContent className="py-4">
@@ -92,7 +155,6 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Doctor Verification */}
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle className="font-display flex items-center gap-2">
@@ -101,44 +163,46 @@ export default function AdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {applications.map(app => (
-                <div key={app.id} className="flex items-center justify-between p-4 rounded-lg border border-border/50">
-                  <div className="space-y-1">
-                    <p className="font-medium text-sm text-foreground">{app.name}</p>
-                    <p className="text-xs text-muted-foreground">{app.email}</p>
-                    <div className="flex gap-2 mt-1">
-                      <Badge variant="secondary" className="text-xs">
-                        License: {app.license}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        {app.specialization}
-                      </Badge>
+            {loading ? (
+              <p className="text-center text-muted-foreground py-8">Loading...</p>
+            ) : applications.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No doctor applications yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {applications.map(app => (
+                  <div key={app.id} className="flex items-center justify-between p-4 rounded-lg border border-border/50">
+                    <div className="space-y-1">
+                      <p className="font-medium text-sm text-foreground">{app.name}</p>
+                      <p className="text-xs text-muted-foreground">{app.email}</p>
+                      <div className="flex gap-2 mt-1">
+                        <Badge variant="secondary" className="text-xs">License: {app.license_number}</Badge>
+                        <Badge variant="secondary" className="text-xs">{app.specialization}</Badge>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {app.status === 'pending' ? (
+                        <>
+                          <Button size="sm" variant="success" onClick={() => handleDecision(app.id, app.user_id, 'approved')}>
+                            <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDecision(app.id, app.user_id, 'rejected')}>
+                            <XCircle className="h-4 w-4 mr-1" /> Reject
+                          </Button>
+                        </>
+                      ) : (
+                        <Badge className={
+                          app.status === 'approved'
+                            ? "bg-success/10 text-success border-success/20"
+                            : "bg-destructive/10 text-destructive border-destructive/20"
+                        } variant="outline">
+                          {app.status === 'approved' ? 'Verified' : 'Rejected'}
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {app.status === 'pending' ? (
-                      <>
-                        <Button size="sm" variant="success" onClick={() => handleDecision(app.id, 'approved')}>
-                          <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleDecision(app.id, 'rejected')}>
-                          <XCircle className="h-4 w-4 mr-1" /> Reject
-                        </Button>
-                      </>
-                    ) : (
-                      <Badge className={
-                        app.status === 'approved'
-                          ? "bg-success/10 text-success border-success/20"
-                          : "bg-destructive/10 text-destructive border-destructive/20"
-                      } variant="outline">
-                        {app.status === 'approved' ? 'Verified' : 'Rejected'}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportCard } from "@/components/ReportCard";
@@ -10,54 +10,59 @@ import logo from "@/assets/retino-logo.png";
 import { Upload, LogOut, FileText, Eye, AlertCircle, Download, History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-const MOCK_REPORTS: Report[] = [
-  {
-    id: "rpt-001-abc",
-    patientId: "p-001",
-    patientName: "You",
-    imageUrl: "",
-    grade: 0,
-    confidence: 0.96,
-    gradeLabel: "No Diabetic Retinopathy",
-    riskLevel: "Low",
-    explanation: "No signs detected.",
-    recommendations: ["Continue annual screening"],
-    status: "approved",
-    createdAt: "2026-02-15T10:00:00Z",
-    reviewedAt: "2026-02-16T09:00:00Z",
-    reviewedBy: "Dr. Sharma",
-  },
-  {
-    id: "rpt-002-def",
-    patientId: "p-001",
-    patientName: "You",
-    imageUrl: "",
-    grade: 1,
-    confidence: 0.91,
-    gradeLabel: "Mild NPDR",
-    riskLevel: "Low-Moderate",
-    explanation: "Mild signs detected.",
-    recommendations: ["Follow up in 9-12 months"],
-    status: "pending_review",
-    createdAt: "2026-03-01T14:00:00Z",
-  },
-];
 
 export default function PatientDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [reports, setReports] = useState<Report[]>(MOCK_REPORTS);
+  const { user, signOut } = useAuth();
+  const [reports, setReports] = useState<Report[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<AIResult | null>(null);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [loadingReports, setLoadingReports] = useState(true);
   const [steps, setSteps] = useState<AnalysisStep[]>([
     { label: "Uploading Image...", status: "pending" },
     { label: "Analyzing Retina...", status: "pending" },
     { label: "Generating Report...", status: "pending" },
   ]);
+
+  // Load reports from database
+  useEffect(() => {
+    if (!user) return;
+    const fetchReports = async () => {
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("patient_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (data) {
+        setReports(data.map(r => ({
+          id: r.id,
+          patientId: r.patient_id,
+          patientName: "You",
+          imageUrl: r.image_path,
+          grade: r.grade as 0|1|2|3|4,
+          confidence: Number(r.confidence),
+          gradeLabel: r.grade_label,
+          riskLevel: r.risk_level,
+          explanation: r.explanation,
+          recommendations: r.recommendations || [],
+          status: r.status as Report['status'],
+          createdAt: r.created_at,
+          reviewedAt: r.reviewed_at || undefined,
+          reviewedBy: r.reviewed_by || undefined,
+          doctorNotes: r.doctor_notes || undefined,
+        })));
+      }
+      setLoadingReports(false);
+    };
+    fetchReports();
+  }, [user]);
 
   const updateStep = (index: number, status: AnalysisStep['status']) => {
     setSteps(prev => prev.map((s, i) => i === index ? { ...s, status } : s));
@@ -65,7 +70,7 @@ export default function PatientDashboard() {
 
   const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
     setUploadedFile(file);
     setAnalyzing(true);
     setAiResult(null);
@@ -75,38 +80,76 @@ export default function PatientDashboard() {
       { label: "Generating Report...", status: "pending" },
     ]);
 
-    // Step 1: Upload
-    await new Promise(r => setTimeout(r, 1200));
+    // Step 1: Upload to Supabase Storage
+    const filePath = `${user.id}/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("retinal-images")
+      .upload(filePath, file);
+
+    if (uploadError) {
+      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
+      setAnalyzing(false);
+      return;
+    }
+
     updateStep(0, "complete");
     updateStep(1, "active");
 
-    // Step 2: AI Analysis
+    // Step 2: AI Analysis (simulated for now — will use ONNX when model is provided)
     const result = await simulateAIAnalysis();
 
     updateStep(1, "complete");
     updateStep(2, "active");
-    await new Promise(r => setTimeout(r, 800));
-    updateStep(2, "complete");
 
+    // Step 3: Save report to database
+    const { data: reportData, error: reportError } = await supabase
+      .from("reports")
+      .insert({
+        patient_id: user.id,
+        image_path: filePath,
+        grade: result.grade,
+        confidence: result.confidence,
+        grade_label: result.gradeLabel,
+        risk_level: result.riskLevel,
+        explanation: result.explanation,
+        recommendations: result.recommendations,
+        status: "pending_review",
+      })
+      .select()
+      .single();
+
+    updateStep(2, "complete");
     setAiResult(result);
 
-    const newReport: Report = {
-      id: `rpt-${Date.now()}`,
-      patientId: "p-001",
-      patientName: "You",
-      imageUrl: URL.createObjectURL(file),
-      grade: result.grade,
-      confidence: result.confidence,
-      gradeLabel: result.gradeLabel,
-      riskLevel: result.riskLevel,
-      explanation: result.explanation,
-      recommendations: result.recommendations,
-      status: "pending_review",
-      createdAt: new Date().toISOString(),
-    };
-    setReports(prev => [newReport, ...prev]);
+    if (reportData) {
+      const newReport: Report = {
+        id: reportData.id,
+        patientId: reportData.patient_id,
+        patientName: "You",
+        imageUrl: filePath,
+        grade: reportData.grade as Report['grade'],
+        confidence: Number(reportData.confidence),
+        gradeLabel: reportData.grade_label,
+        riskLevel: reportData.risk_level,
+        explanation: reportData.explanation,
+        recommendations: reportData.recommendations || [],
+        status: reportData.status as Report['status'],
+        createdAt: reportData.created_at,
+      };
+      setReports(prev => [newReport, ...prev]);
+    }
+
+    // Log to audit
+    await supabase.from("audit_logs").insert({
+      user_id: user.id,
+      action: "image_uploaded",
+      entity_type: "report",
+      entity_id: reportData?.id,
+      details: { grade: result.grade, confidence: result.confidence },
+    });
+
     toast({ title: "Analysis Complete", description: `Grade ${result.grade} — ${result.gradeLabel}` });
-  }, [toast]);
+  }, [toast, user]);
 
   const resetUpload = () => {
     setAnalyzing(false);
@@ -119,18 +162,25 @@ export default function PatientDashboard() {
     ]);
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-2">
             <img src={logo} alt="Retino AI" className="h-8 w-8" />
             <span className="font-display font-bold text-foreground">Patient Portal</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-            <LogOut className="h-4 w-4 mr-2" /> Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground hidden sm:block">{user?.email}</span>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" /> Logout
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -153,15 +203,10 @@ export default function PatientDashboard() {
                     Upload Retinal Image
                   </h3>
                   <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-                    Supported formats: JPEG, PNG. The image will be analyzed by our AI model locally.
+                    Supported formats: JPEG, PNG. The image will be analyzed by our AI model.
                   </p>
                   <label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleUpload}
-                    />
+                    <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
                     <Button variant="hero" size="lg" asChild>
                       <span>Choose Image</span>
                     </Button>
@@ -206,7 +251,6 @@ export default function PatientDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <GradeScale activeGrade={aiResult.grade} confidence={aiResult.confidence} />
-
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="rounded-lg bg-muted p-4">
                       <p className="text-xs text-muted-foreground mb-1">Risk Level</p>
@@ -217,12 +261,10 @@ export default function PatientDashboard() {
                       <p className="font-semibold text-foreground">{Math.round(aiResult.confidence * 100)}%</p>
                     </div>
                   </div>
-
                   <div className="rounded-lg bg-muted p-4">
                     <p className="text-xs text-muted-foreground mb-2">Clinical Explanation</p>
                     <p className="text-sm text-foreground">{aiResult.explanation}</p>
                   </div>
-
                   <div className="rounded-lg bg-muted p-4">
                     <p className="text-xs text-muted-foreground mb-2">Recommendations</p>
                     <ul className="space-y-1">
@@ -233,21 +275,15 @@ export default function PatientDashboard() {
                       ))}
                     </ul>
                   </div>
-
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-warning/10 border border-warning/20">
                     <AlertCircle className="h-5 w-5 text-warning flex-shrink-0" />
                     <p className="text-sm text-foreground">
                       This report is <strong>pending doctor review</strong>. Download will be available after approval.
                     </p>
                   </div>
-
                   <div className="flex gap-3">
-                    <Button variant="outline" onClick={resetUpload}>
-                      New Scan
-                    </Button>
-                    <Button disabled>
-                      <Download className="h-4 w-4 mr-2" /> Download Report
-                    </Button>
+                    <Button variant="outline" onClick={resetUpload}>New Scan</Button>
+                    <Button disabled><Download className="h-4 w-4 mr-2" /> Download Report</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -260,18 +296,19 @@ export default function PatientDashboard() {
               <History className="h-5 w-5 text-primary" />
               <h2 className="font-display font-semibold text-lg text-foreground">Your Reports</h2>
             </div>
-            {reports.map((report) => (
-              <ReportCard
-                key={report.id}
-                report={report}
-                onClick={() => setSelectedReport(report)}
-              />
-            ))}
+            {loadingReports ? (
+              <p className="text-sm text-muted-foreground">Loading reports...</p>
+            ) : reports.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No reports yet. Upload your first retinal image.</p>
+            ) : (
+              reports.map((report) => (
+                <ReportCard key={report.id} report={report} onClick={() => setSelectedReport(report)} />
+              ))
+            )}
           </div>
         </div>
       </main>
 
-      {/* Report Detail Dialog */}
       <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
