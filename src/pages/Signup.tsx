@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import logo from "@/assets/retino-logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import {
   emailSchema,
   passwordSchema,
