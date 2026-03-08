@@ -510,7 +510,7 @@ export default function PatientDashboard() {
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs text-muted-foreground mb-2">{t("scan.recommendations")}</p>
                 <ul className="space-y-1">
-                  {aiResult.recommendations.map((r, i) => (
+                  {(aiResult.recommendations || []).map((r, i) => (
                     <li key={i} className="text-sm text-foreground flex items-start gap-2">
                       <span className="text-primary mt-0.5">•</span> {r}
                     </li>
