@@ -262,13 +262,13 @@ export default function PatientDashboard() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-foreground">{t("nav.notifications")}</h1>
-        <p className="text-muted-foreground text-sm mt-1">Stay updated on your report status</p>
+        <p className="text-muted-foreground text-sm mt-1">{t("notifications.stayUpdated")}</p>
       </div>
       {reports.filter(r => r.status === "approved" || r.status === "rejected").length === 0 ? (
         <Card className="shadow-card">
           <CardContent className="py-16 text-center">
             <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No notifications yet</p>
+            <p className="text-muted-foreground">{t("notifications.noNotifications")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -281,7 +281,7 @@ export default function PatientDashboard() {
                     <div className={`h-3 w-3 rounded-full ${r.status === "approved" ? "bg-success" : "bg-destructive"}`} />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">
-                        Report #{r.id.slice(0, 8)} — {r.status === "approved" ? "Approved ✓" : "Rejected ✗"}
+                        Report #{r.id.slice(0, 8)} — {r.status === "approved" ? `${t("home.approved")} ✓` : "✗"}
                       </p>
                       <p className="text-xs text-muted-foreground">{r.gradeLabel} · {new Date(r.createdAt).toLocaleDateString()}</p>
                     </div>
@@ -302,12 +302,12 @@ export default function PatientDashboard() {
         <p className="text-muted-foreground text-sm mt-1">{t("education.subtitle")}</p>
       </div>
       {[
-        { title: "What is Diabetic Retinopathy?", content: "Diabetic retinopathy (DR) is a diabetes complication that affects the eyes. It's caused by damage to the blood vessels of the light-sensitive tissue at the back of the eye (retina). It can develop in anyone who has type 1 or type 2 diabetes.", color: "from-primary/10 to-accent" },
-        { title: "Understanding the Grades", content: "Grade 0: No DR — Normal retina. Grade 1: Mild NPDR — Microaneurysms only. Grade 2: Moderate NPDR — More than just microaneurysms. Grade 3: Severe NPDR — Many hemorrhages and abnormalities. Grade 4: Proliferative DR — New blood vessel growth, most severe.", color: "from-warning/10 to-accent" },
-        { title: "Prevention Tips", content: "Control blood sugar levels, maintain healthy blood pressure, get regular eye exams, exercise regularly, avoid smoking, and maintain a healthy diet rich in omega-3 fatty acids and antioxidants.", color: "from-success/10 to-accent" },
-        { title: "When to See a Doctor", content: "See an ophthalmologist immediately if you experience: sudden vision changes, floaters, blurred vision, dark areas in your vision, or difficulty perceiving colors. Early detection is key to preventing vision loss.", color: "from-destructive/10 to-accent" },
+        { title: t("education.whatIsDR"), content: t("education.whatIsDRDesc"), color: "from-primary/10 to-accent" },
+        { title: t("education.grades"), content: t("education.gradesDesc"), color: "from-warning/10 to-accent" },
+        { title: t("education.prevention"), content: t("education.preventionDesc"), color: "from-success/10 to-accent" },
+        { title: t("education.whenToSee"), content: t("education.whenToSeeDesc"), color: "from-destructive/10 to-accent" },
       ].map((card, i) => (
-        <motion.div key={card.title} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ y: -2 }}>
+        <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ y: -2 }}>
           <Card className={`shadow-card bg-gradient-to-br ${card.color}`}>
             <CardHeader>
               <CardTitle className="font-display text-base text-foreground">{card.title}</CardTitle>
@@ -331,13 +331,11 @@ export default function PatientDashboard() {
         <CardContent className="py-6">
           <div className="text-center space-y-4">
             <Phone className="h-12 w-12 text-destructive mx-auto" />
-            <h3 className="font-display font-bold text-lg text-foreground">Emergency Eye Care</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              If you're experiencing sudden vision loss, severe eye pain, or flashes of light, seek immediate medical attention.
-            </p>
+            <h3 className="font-display font-bold text-lg text-foreground">{t("emergency.eyeCare")}</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">{t("emergency.seekHelp")}</p>
             <div className="grid sm:grid-cols-2 gap-3 max-w-md mx-auto">
               <Button variant="destructive" size="lg" asChild>
-                <a href="tel:108">Call 108 (Ambulance)</a>
+                <a href="tel:108">Call 108</a>
               </Button>
               <Button variant="outline" size="lg" asChild>
                 <a href="tel:1800-599-0019">AIIMS Helpline</a>
@@ -348,20 +346,13 @@ export default function PatientDashboard() {
       </Card>
       <Card className="shadow-card">
         <CardHeader>
-          <CardTitle className="font-display text-base">Warning Signs — Seek Immediate Help</CardTitle>
+          <CardTitle className="font-display text-base">{t("emergency.warningSigns")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {[
-              "Sudden loss of vision in one or both eyes",
-              "Sudden increase in floaters or flashes of light",
-              "Curtain-like shadow over your visual field",
-              "Severe eye pain with nausea or vomiting",
-              "Eye injury or foreign object in eye",
-              "Sudden onset of double vision",
-            ].map((item, i) => (
+            {["emergency.sign1", "emergency.sign2", "emergency.sign3", "emergency.sign4", "emergency.sign5", "emergency.sign6"].map((key, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="text-destructive mt-0.5 font-bold">!</span> {item}
+                <span className="text-destructive mt-0.5 font-bold">!</span> {t(key)}
               </li>
             ))}
           </ul>
@@ -519,7 +510,7 @@ export default function PatientDashboard() {
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs text-muted-foreground mb-2">{t("scan.recommendations")}</p>
                 <ul className="space-y-1">
-                  {aiResult.recommendations.map((r, i) => (
+                  {(aiResult.recommendations || []).map((r, i) => (
                     <li key={i} className="text-sm text-foreground flex items-start gap-2">
                       <span className="text-primary mt-0.5">•</span> {r}
                     </li>
@@ -607,7 +598,7 @@ export default function PatientDashboard() {
                 <p className="text-sm text-foreground">{selectedReport.explanation}</p>
               </div>
               <div className="rounded-lg bg-muted p-4">
-                <p className="text-xs text-muted-foreground mb-1">Status</p>
+                <p className="text-xs text-muted-foreground mb-1">{t("common.status")}</p>
                 <p className="text-sm text-foreground capitalize">{selectedReport.status.replace('_', ' ')}</p>
               </div>
               {selectedReport.status === 'approved' && (
@@ -617,7 +608,7 @@ export default function PatientDashboard() {
               )}
               {selectedReport.status === 'rejected' && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-foreground">
-                  This report requires re-evaluation. Please upload a new retinal image.
+                  {t("report.rejectedMsg")}
                 </div>
               )}
             </div>

@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/hooks/useI18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, Save, Loader2, KeyRound } from "lucide-react";
+import { User, Mail, Phone, Save, Loader2, KeyRound, Lock } from "lucide-react";
 
 export function PatientAccountPage() {
   const { user } = useAuth();
@@ -21,6 +21,9 @@ export function PatientAccountPage() {
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -56,6 +59,27 @@ export function PatientAccountPage() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast({ title: "Error", description: t("account.passwordMinLength"), variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: t("account.passwordMismatch"), variant: "destructive" });
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setChangingPassword(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: t("account.passwordChanged"), description: "" });
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
+
   const initials = user?.email?.slice(0, 2).toUpperCase() || "U";
 
   if (loading) return <p className="text-muted-foreground text-center py-12">{t("common.loading")}</p>;
@@ -87,7 +111,7 @@ export function PatientAccountPage() {
                 </p>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
+                  {t("account.memberSince")} {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
                 </p>
               </div>
             </div>
@@ -136,32 +160,55 @@ export function PatientAccountPage() {
         </Card>
       </motion.div>
 
-      {/* Security */}
+      {/* Security — Change Password */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle className="font-display text-base flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-primary" /> Security
+              <KeyRound className="h-5 w-5 text-primary" /> {t("account.security")}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium text-foreground">Password</p>
-                <p className="text-xs text-muted-foreground">Last changed: Unknown</p>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">{t("account.newPassword")}</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="pl-10"
+                />
               </div>
-              <Button variant="outline" size="sm" disabled>
-                Change Password
-              </Button>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">{t("account.confirmPassword")}</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <Button onClick={handleChangePassword} disabled={changingPassword || !newPassword} variant="outline" className="w-full sm:w-auto">
+              {changingPassword ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
+              {t("account.changePassword")}
+            </Button>
             <Separator className="my-3" />
             <div className="flex items-center justify-between py-2">
               <div>
-                <p className="text-sm font-medium text-foreground">Two-Factor Authentication</p>
-                <p className="text-xs text-muted-foreground">Add an extra layer of security</p>
+                <p className="text-sm font-medium text-foreground">{t("account.twoFactor")}</p>
+                <p className="text-xs text-muted-foreground">{t("account.twoFactorDesc")}</p>
               </div>
               <span className="text-xs px-2 py-1 rounded-full bg-warning/10 text-warning font-medium">
-                Coming Soon
+                {t("common.comingSoon")}
               </span>
             </div>
           </CardContent>
