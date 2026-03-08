@@ -262,13 +262,13 @@ export default function PatientDashboard() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-foreground">{t("nav.notifications")}</h1>
-        <p className="text-muted-foreground text-sm mt-1">Stay updated on your report status</p>
+        <p className="text-muted-foreground text-sm mt-1">{t("notifications.stayUpdated")}</p>
       </div>
       {reports.filter(r => r.status === "approved" || r.status === "rejected").length === 0 ? (
         <Card className="shadow-card">
           <CardContent className="py-16 text-center">
             <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No notifications yet</p>
+            <p className="text-muted-foreground">{t("notifications.noNotifications")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -281,7 +281,7 @@ export default function PatientDashboard() {
                     <div className={`h-3 w-3 rounded-full ${r.status === "approved" ? "bg-success" : "bg-destructive"}`} />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">
-                        Report #{r.id.slice(0, 8)} — {r.status === "approved" ? "Approved ✓" : "Rejected ✗"}
+                        Report #{r.id.slice(0, 8)} — {r.status === "approved" ? `${t("home.approved")} ✓` : "✗"}
                       </p>
                       <p className="text-xs text-muted-foreground">{r.gradeLabel} · {new Date(r.createdAt).toLocaleDateString()}</p>
                     </div>
