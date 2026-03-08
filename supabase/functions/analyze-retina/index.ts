@@ -30,42 +30,18 @@ serve(async (req) => {
       ml: "Malayalam",
     }[language || "en"] || "English";
 
-    const systemPrompt = `You are an expert ophthalmologist AI specializing in diabetic retinopathy (DR) grading using the ICDR scale. You are precise — you neither over-grade nor under-grade.
+    // Use ONNX grade if provided, otherwise let Gemini grade
+    const hasOnnxGrade = onnxGrade !== undefined && onnxGrade !== null;
+    
+    const gradeContext = hasOnnxGrade 
+      ? `\n\nIMPORTANT: A specialized retinopathy classification model has determined this image is Grade ${onnxGrade} (${onnxGradeLabel}, Risk: ${onnxRiskLevel}). You MUST use this grade. Do NOT change the grade. Your job is ONLY to provide a detailed clinical explanation and recommendations for this grade based on what you see in the image.`
+      : "";
 
-Respond using the "analyze_retina" tool. Write in ${langName}.
+    const systemPrompt = `You are an expert ophthalmologist AI. Analyze the retinal fundus image and respond using the "analyze_retina" tool. Write in ${langName}.
 
-GRADING SCALE (ICDR):
+Grade scale: 0=No DR, 1=Mild NPDR (microaneurysms only), 2=Moderate NPDR, 3=Severe NPDR, 4=Proliferative DR.${gradeContext}
 
-Grade 0 — No DR:
-  - Completely normal retina with zero pathological findings.
-  - Normal vessel reflections, pigmentation, choroidal patterns, and imaging artifacts are NOT lesions.
-
-Grade 1 — Mild NPDR:
-  - Microaneurysms ONLY: tiny dark red dots (<125μm), round, well-defined, located away from vessel walls.
-  - Even 1-2 definite microaneurysms = Grade 1.
-  - Microaneurysms appear as small, round, dark red spots that are SEPARATE from blood vessels.
-  - They are often found in the posterior pole, near the macula.
-  - Do NOT dismiss subtle but real microaneurysms as artifacts — if a dark red dot is round, well-defined, and not on a vessel, it IS a microaneurysm.
-  - No hemorrhages, exudates, or cotton wool spots should be present for Grade 1.
-
-Grade 2 — Moderate NPDR:
-  - Dot-blot hemorrhages, hard exudates, OR cotton wool spots present (beyond just microaneurysms).
-  - Does NOT meet "4-2-1 rule".
-
-Grade 3 — Severe NPDR:
-  - Meets at least one of: hemorrhages in all 4 quadrants, venous beading in 2+ quadrants, IRMA in 1+ quadrant.
-
-Grade 4 — Proliferative DR:
-  - Neovascularization, vitreous/preretinal hemorrhage, or tractional detachment.
-
-GRADING DECISION PROCESS:
-1. First, scan the ENTIRE image systematically — all 4 quadrants plus macula.
-2. List every abnormal finding you see, with its exact location.
-3. Classify each finding: microaneurysm, hemorrhage, exudate, cotton wool spot, etc.
-4. If NO findings → Grade 0.
-5. If ONLY microaneurysms found → Grade 1.
-6. If hemorrhages/exudates/cotton wool spots found → Grade 2 or higher.
-7. Do NOT confuse imaging artifacts with lesions, but also do NOT dismiss real lesions as artifacts.
+Provide a detailed, image-specific clinical explanation describing what you observe. List 3-5 actionable clinical recommendations.
 
 IMPORTANT: Call the analyze_retina tool with ALL fields. Do NOT return null values.`;
 
