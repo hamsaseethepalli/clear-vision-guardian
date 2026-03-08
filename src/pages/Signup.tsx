@@ -35,6 +35,7 @@ export default function Signup() {
   const [license, setLicense] = useState("");
   const [specialization, setSpecialization] = useState("");
   const [otp, setOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = useCallback(() => {
