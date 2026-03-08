@@ -9,20 +9,33 @@ import { PatientHome } from "@/components/PatientHome";
 import { PatientSettingsPage } from "@/components/PatientSettingsPage";
 import { PatientAccountPage } from "@/components/PatientAccountPage";
 import { PatientSidebar } from "@/components/PatientSidebar";
-import { analyzeRetinalImage, type ONNXResult } from "@/lib/onnxInference";
-import { analyzeImageFallback } from "@/lib/imageAnalysisFallback";
+import type { ONNXResult } from "@/lib/onnxInference";
 import type { Report, AnalysisStep } from "@/lib/types";
-import { Upload, FileText, Eye, AlertCircle, Download, History, Stethoscope } from "lucide-react";
+import { Upload, FileText, Eye, AlertCircle, Download, History, BookOpen, Phone, HelpCircle, Bell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/hooks/useI18n";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]); // strip data:... prefix
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function PatientDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { t, language } = useI18n();
   const [reports, setReports] = useState<Report[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<ONNXResult | null>(null);
@@ -37,11 +50,6 @@ export default function PatientDashboard() {
     { label: "Analyzing Retina...", status: "pending" },
     { label: "Generating Report...", status: "pending" },
   ]);
-
-  useEffect(() => {
-    // preload model silently
-    import("@/lib/onnxInference").then(m => m.preloadModel());
-  }, []);
 
   // Load reports
   useEffect(() => {
@@ -108,14 +116,31 @@ export default function PatientDashboard() {
     updateStep(0, "complete");
     updateStep(1, "active");
 
-    // Step 2: AI Analysis - try ONNX first, fallback to mock
+    // Step 2: AI Analysis via Gemini Vision
     let result: ONNXResult;
     try {
-      result = await analyzeRetinalImage(file);
-    } catch {
-      // ONNX failed, use image-aware fallback analysis
-      console.warn("ONNX model unavailable, using image-based fallback analysis");
-      result = await analyzeImageFallback(file);
+      const imageBase64 = await fileToBase64(file);
+      const { data: aiData, error: aiError } = await supabase.functions.invoke("analyze-retina", {
+        body: { imageBase64, language },
+      });
+
+      if (aiError) throw new Error(aiError.message);
+      if (aiData?.error) throw new Error(aiData.error);
+
+      result = {
+        grade: aiData.grade as 0|1|2|3|4,
+        confidence: aiData.confidence,
+        gradeLabel: aiData.gradeLabel,
+        riskLevel: aiData.riskLevel,
+        explanation: aiData.explanation,
+        recommendations: aiData.recommendations,
+        probabilities: [0, 1, 2, 3, 4].map(g => g === aiData.grade ? aiData.confidence : (1 - aiData.confidence) / 4),
+      };
+    } catch (err) {
+      console.error("AI analysis error:", err);
+      toast({ title: "Analysis failed", description: "Could not analyze the image. Please try again.", variant: "destructive" });
+      setAnalyzing(false);
+      return;
     }
 
     updateStep(1, "complete");
@@ -170,7 +195,7 @@ export default function PatientDashboard() {
     });
 
     toast({ title: "Analysis Complete", description: `Grade ${result.grade} — ${result.gradeLabel}` });
-  }, [toast, user, selectedDoctorId, selectedHospitalId]);
+  }, [toast, user, selectedDoctorId, selectedHospitalId, language]);
 
   const resetUpload = () => {
     setAnalyzing(false);
@@ -181,6 +206,19 @@ export default function PatientDashboard() {
       { label: "Analyzing Retina...", status: "pending" },
       { label: "Generating Report...", status: "pending" },
     ]);
+  };
+
+  const viewTitles: Record<string, string> = {
+    home: t("nav.home"),
+    scan: t("nav.scan"),
+    history: t("nav.history"),
+    doctors: t("nav.doctors"),
+    settings: t("nav.settings"),
+    account: t("nav.account"),
+    notifications: t("nav.notifications"),
+    education: t("nav.education"),
+    emergency: t("nav.emergency"),
+    help: t("nav.help"),
   };
 
   const renderView = () => {
@@ -197,16 +235,162 @@ export default function PatientDashboard() {
         return <PatientSettingsPage />;
       case "account":
         return <PatientAccountPage />;
+      case "notifications":
+        return renderNotificationsView();
+      case "education":
+        return renderEducationView();
+      case "emergency":
+        return renderEmergencyView();
+      case "help":
+        return renderHelpView();
       default:
         return <PatientHome reports={reports} onNavigate={setActiveView} />;
     }
   };
 
+  const renderNotificationsView = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("nav.notifications")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">Stay updated on your report status</p>
+      </div>
+      {reports.filter(r => r.status === "approved" || r.status === "rejected").length === 0 ? (
+        <Card className="shadow-card">
+          <CardContent className="py-16 text-center">
+            <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No notifications yet</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {reports.filter(r => r.status !== "pending_review").map((r, i) => (
+            <motion.div key={r.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
+              <Card className="shadow-card hover:shadow-elevated transition-all cursor-pointer" onClick={() => setSelectedReport(r)}>
+                <CardContent className="py-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-3 w-3 rounded-full ${r.status === "approved" ? "bg-success" : "bg-destructive"}`} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Report #{r.id.slice(0, 8)} — {r.status === "approved" ? "Approved ✓" : "Rejected ✗"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{r.gradeLabel} · {new Date(r.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+
+  const renderEducationView = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("education.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("education.subtitle")}</p>
+      </div>
+      {[
+        { title: "What is Diabetic Retinopathy?", content: "Diabetic retinopathy (DR) is a diabetes complication that affects the eyes. It's caused by damage to the blood vessels of the light-sensitive tissue at the back of the eye (retina). It can develop in anyone who has type 1 or type 2 diabetes.", color: "from-primary/10 to-accent" },
+        { title: "Understanding the Grades", content: "Grade 0: No DR — Normal retina. Grade 1: Mild NPDR — Microaneurysms only. Grade 2: Moderate NPDR — More than just microaneurysms. Grade 3: Severe NPDR — Many hemorrhages and abnormalities. Grade 4: Proliferative DR — New blood vessel growth, most severe.", color: "from-warning/10 to-accent" },
+        { title: "Prevention Tips", content: "Control blood sugar levels, maintain healthy blood pressure, get regular eye exams, exercise regularly, avoid smoking, and maintain a healthy diet rich in omega-3 fatty acids and antioxidants.", color: "from-success/10 to-accent" },
+        { title: "When to See a Doctor", content: "See an ophthalmologist immediately if you experience: sudden vision changes, floaters, blurred vision, dark areas in your vision, or difficulty perceiving colors. Early detection is key to preventing vision loss.", color: "from-destructive/10 to-accent" },
+      ].map((card, i) => (
+        <motion.div key={card.title} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ y: -2 }}>
+          <Card className={`shadow-card bg-gradient-to-br ${card.color}`}>
+            <CardHeader>
+              <CardTitle className="font-display text-base text-foreground">{card.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-foreground/80 leading-relaxed">{card.content}</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+
+  const renderEmergencyView = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("emergency.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("emergency.subtitle")}</p>
+      </div>
+      <Card className="shadow-card border-destructive/30 bg-destructive/5">
+        <CardContent className="py-6">
+          <div className="text-center space-y-4">
+            <Phone className="h-12 w-12 text-destructive mx-auto" />
+            <h3 className="font-display font-bold text-lg text-foreground">Emergency Eye Care</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              If you're experiencing sudden vision loss, severe eye pain, or flashes of light, seek immediate medical attention.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3 max-w-md mx-auto">
+              <Button variant="destructive" size="lg" asChild>
+                <a href="tel:108">Call 108 (Ambulance)</a>
+              </Button>
+              <Button variant="outline" size="lg" asChild>
+                <a href="tel:1800-599-0019">AIIMS Helpline</a>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="font-display text-base">Warning Signs — Seek Immediate Help</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            {[
+              "Sudden loss of vision in one or both eyes",
+              "Sudden increase in floaters or flashes of light",
+              "Curtain-like shadow over your visual field",
+              "Severe eye pain with nausea or vomiting",
+              "Eye injury or foreign object in eye",
+              "Sudden onset of double vision",
+            ].map((item, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                <span className="text-destructive mt-0.5 font-bold">!</span> {item}
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  const renderHelpView = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("help.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("help.subtitle")}</p>
+      </div>
+      {[
+        { q: "How do I upload a retinal image?", a: "Go to 'New Scan' in the sidebar, optionally select a hospital and doctor, then click 'Choose Image' to upload a retinal fundus photograph." },
+        { q: "How accurate is the AI analysis?", a: "Our AI uses Gemini Vision to analyze retinal images. While highly accurate, all results must be verified by a qualified ophthalmologist before clinical decisions are made." },
+        { q: "How long does analysis take?", a: "Typically 10-30 seconds depending on image size and server load." },
+        { q: "Can I choose which doctor reviews my report?", a: "Yes! Go to 'Find Doctors' to select a hospital and specific doctor. Your next scan will be sent to them for verification." },
+        { q: "When can I download my report?", a: "Reports can be downloaded after a doctor approves them. You'll receive a notification when this happens." },
+        { q: "Is my data secure?", a: "Yes. All medical data is encrypted end-to-end, and we comply with HIPAA regulations. Your retinal images are stored securely and only accessible to you and your assigned doctor." },
+      ].map((faq, i) => (
+        <motion.div key={faq.q} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+          <Card className="shadow-card">
+            <CardContent className="py-4">
+              <p className="font-medium text-sm text-foreground mb-2">{faq.q}</p>
+              <p className="text-sm text-muted-foreground">{faq.a}</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+
   const renderDoctorsView = () => (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold text-foreground">Find Doctors</h1>
-        <p className="text-muted-foreground text-sm mt-1">Select a hospital and doctor for your report verification</p>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("doctors.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("doctors.subtitle")}</p>
       </div>
       <DoctorSelector
         selectedHospitalId={selectedHospitalId}
@@ -216,11 +400,9 @@ export default function PatientDashboard() {
       />
       {selectedDoctorId && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 rounded-xl bg-success/10 border border-success/20">
-          <p className="text-sm text-foreground">
-            ✓ Doctor selected. Your next scan will be sent to this doctor for verification.
-          </p>
+          <p className="text-sm text-foreground">✓ {t("doctors.selected")}</p>
           <Button variant="hero" className="mt-3" onClick={() => setActiveView("scan")}>
-            <Upload className="h-4 w-4 mr-2" /> Start Scan Now
+            <Upload className="h-4 w-4 mr-2" /> {t("doctors.startScan")}
           </Button>
         </motion.div>
       )}
@@ -230,11 +412,10 @@ export default function PatientDashboard() {
   const renderScanView = () => (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="font-display text-2xl font-bold text-foreground">Retinal Screening</h1>
-        <p className="text-muted-foreground text-sm mt-1">Upload a retinal fundus image for AI analysis</p>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("scan.title")}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t("scan.subtitle")}</p>
       </div>
 
-      {/* Doctor selector for this scan */}
       {!analyzing && !aiResult && (
         <DoctorSelector
           selectedHospitalId={selectedHospitalId}
@@ -255,16 +436,12 @@ export default function PatientDashboard() {
               >
                 <Upload className="h-8 w-8 text-primary" />
               </motion.div>
-              <h3 className="font-display font-semibold text-lg text-foreground mb-2">
-                Upload Retinal Image
-              </h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-                Supported formats: JPEG, PNG. The image will be analyzed by our AI model.
-              </p>
+              <h3 className="font-display font-semibold text-lg text-foreground mb-2">{t("scan.upload")}</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">{t("scan.formats")}</p>
               <label>
                 <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
                 <Button variant="hero" size="lg" asChild>
-                  <span>Choose Image</span>
+                  <span>{t("scan.choose")}</span>
                 </Button>
               </label>
             </CardContent>
@@ -277,7 +454,7 @@ export default function PatientDashboard() {
           <CardHeader>
             <CardTitle className="font-display flex items-center gap-2">
               <Eye className="h-5 w-5 text-primary animate-pulse" />
-              Analyzing...
+              {t("scan.analyzing")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -300,27 +477,27 @@ export default function PatientDashboard() {
             <CardHeader>
               <CardTitle className="font-display flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                Analysis Result
+                {t("scan.result")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <GradeScale activeGrade={aiResult.grade} confidence={aiResult.confidence} />
               <div className="grid sm:grid-cols-2 gap-4">
                 <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg bg-muted p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Risk Level</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("scan.riskLevel")}</p>
                   <p className="font-semibold text-foreground">{aiResult.riskLevel}</p>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg bg-muted p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Confidence</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("scan.confidence")}</p>
                   <p className="font-semibold text-foreground">{Math.round(aiResult.confidence * 100)}%</p>
                 </motion.div>
               </div>
               <div className="rounded-lg bg-muted p-4">
-                <p className="text-xs text-muted-foreground mb-2">Clinical Explanation</p>
+                <p className="text-xs text-muted-foreground mb-2">{t("scan.explanation")}</p>
                 <p className="text-sm text-foreground">{aiResult.explanation}</p>
               </div>
               <div className="rounded-lg bg-muted p-4">
-                <p className="text-xs text-muted-foreground mb-2">Recommendations</p>
+                <p className="text-xs text-muted-foreground mb-2">{t("scan.recommendations")}</p>
                 <ul className="space-y-1">
                   {aiResult.recommendations.map((r, i) => (
                     <li key={i} className="text-sm text-foreground flex items-start gap-2">
@@ -331,13 +508,11 @@ export default function PatientDashboard() {
               </div>
               <div className="flex items-center gap-3 p-3 rounded-lg bg-warning/10 border border-warning/20">
                 <AlertCircle className="h-5 w-5 text-warning flex-shrink-0" />
-                <p className="text-sm text-foreground">
-                  This report is <strong>pending doctor review</strong>. Download will be available after approval.
-                </p>
+                <p className="text-sm text-foreground">{t("scan.pendingReview")}</p>
               </div>
               <div className="flex gap-3">
-                <Button variant="outline" onClick={resetUpload}>New Scan</Button>
-                <Button disabled><Download className="h-4 w-4 mr-2" /> Download Report</Button>
+                <Button variant="outline" onClick={resetUpload}>{t("scan.newScan")}</Button>
+                <Button disabled><Download className="h-4 w-4 mr-2" /> {t("scan.download")}</Button>
               </div>
             </CardContent>
           </Card>
@@ -350,17 +525,17 @@ export default function PatientDashboard() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="flex items-center gap-2">
         <History className="h-5 w-5 text-primary" />
-        <h1 className="font-display text-2xl font-bold text-foreground">Report History</h1>
+        <h1 className="font-display text-2xl font-bold text-foreground">{t("history.title")}</h1>
       </div>
       {loadingReports ? (
-        <p className="text-sm text-muted-foreground">Loading reports...</p>
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : reports.length === 0 ? (
         <Card className="shadow-card">
           <CardContent className="py-16 text-center">
             <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No reports yet. Upload your first retinal image.</p>
+            <p className="text-muted-foreground">{t("history.empty")}</p>
             <Button variant="hero" className="mt-4" onClick={() => setActiveView("scan")}>
-              <Upload className="h-4 w-4 mr-2" /> Start Scan
+              <Upload className="h-4 w-4 mr-2" /> {t("history.startScan")}
             </Button>
           </CardContent>
         </Card>
@@ -389,7 +564,7 @@ export default function PatientDashboard() {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-50 px-4">
             <SidebarTrigger className="mr-3" />
-            <span className="font-display font-semibold text-foreground capitalize">{activeView === "scan" ? "New Scan" : activeView}</span>
+            <span className="font-display font-semibold text-foreground">{viewTitles[activeView] || activeView}</span>
           </header>
           <main className="flex-1 p-6 lg:p-8">
             <AnimatePresence mode="wait">
@@ -408,7 +583,7 @@ export default function PatientDashboard() {
             <div className="space-y-4">
               <GradeScale activeGrade={selectedReport.grade} confidence={selectedReport.confidence} />
               <div className="rounded-lg bg-muted p-4">
-                <p className="text-xs text-muted-foreground mb-1">Explanation</p>
+                <p className="text-xs text-muted-foreground mb-1">{t("scan.explanation")}</p>
                 <p className="text-sm text-foreground">{selectedReport.explanation}</p>
               </div>
               <div className="rounded-lg bg-muted p-4">
@@ -417,7 +592,7 @@ export default function PatientDashboard() {
               </div>
               {selectedReport.status === 'approved' && (
                 <Button className="w-full" variant="hero">
-                  <Download className="h-4 w-4 mr-2" /> Download Report
+                  <Download className="h-4 w-4 mr-2" /> {t("scan.download")}
                 </Button>
               )}
               {selectedReport.status === 'rejected' && (
