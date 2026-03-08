@@ -13,11 +13,12 @@ export default function Landing() {
       <nav className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="Retino AI" className="h-8 w-8" />
-            <span className="font-display font-bold text-lg text-foreground">Retino AI</span>
+            <img src={logo} alt="Retino AI" className="h-10 w-auto" />
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate("/login")}>Log In</Button>
+            <Button variant="ghost" onClick={() => navigate("/login")}>
+              Sign In
+            </Button>
             <Button variant="hero" onClick={() => navigate("/signup")}>
               Get Started
             </Button>
@@ -40,16 +41,21 @@ export default function Landing() {
                   <span className="text-primary">Reimagined</span>
                 </h1>
                 <p className="text-lg text-primary-foreground/70 max-w-lg">
-                  Clinical-grade AI analysis for diabetic retinopathy detection. 
-                  Upload a retinal image and receive instant, accurate grading with 
+                  Clinical-grade AI analysis for diabetic retinopathy detection.
+                  Upload a retinal image and receive instant, accurate grading with
                   doctor-verified reports.
                 </p>
                 <div className="flex flex-wrap gap-4">
                   <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
                     Start Screening <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="lg" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10" onClick={() => navigate("/login")}>
-                    Doctor Login
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
+                    onClick={() => navigate("/login")}
+                  >
+                    Sign In
                   </Button>
                 </div>
               </div>
@@ -124,8 +130,7 @@ export default function Landing() {
       <footer className="py-8 border-t border-border/50 bg-background">
         <div className="container mx-auto px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="Retino AI" className="h-6 w-6" />
-            <span className="font-display font-semibold text-sm text-foreground">Retino AI</span>
+            <img src={logo} alt="Retino AI" className="h-8 w-auto" />
           </div>
           <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} Retino AI. Clinical-grade retinal screening.
