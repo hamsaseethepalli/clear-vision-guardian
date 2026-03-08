@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import logo from "@/assets/retino-logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import {
   emailSchema,
   passwordSchema,
@@ -35,6 +35,7 @@ export default function Signup() {
   const [license, setLicense] = useState("");
   const [specialization, setSpecialization] = useState("");
   const [otp, setOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = useCallback(() => {
@@ -230,14 +231,25 @@ export default function Signup() {
                 </div>
                 <div className="space-y-2">
                   <Label>Password</Label>
-                  <Input
-                    type="password"
-                    placeholder="Min. 8 chars, upper, lower, number, special"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                    aria-invalid={!!errors.password}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Min. 8 chars, upper, lower, number, special"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="new-password"
+                      aria-invalid={!!errors.password}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                 </div>
 
