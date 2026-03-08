@@ -331,13 +331,11 @@ export default function PatientDashboard() {
         <CardContent className="py-6">
           <div className="text-center space-y-4">
             <Phone className="h-12 w-12 text-destructive mx-auto" />
-            <h3 className="font-display font-bold text-lg text-foreground">Emergency Eye Care</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              If you're experiencing sudden vision loss, severe eye pain, or flashes of light, seek immediate medical attention.
-            </p>
+            <h3 className="font-display font-bold text-lg text-foreground">{t("emergency.eyeCare")}</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">{t("emergency.seekHelp")}</p>
             <div className="grid sm:grid-cols-2 gap-3 max-w-md mx-auto">
               <Button variant="destructive" size="lg" asChild>
-                <a href="tel:108">Call 108 (Ambulance)</a>
+                <a href="tel:108">Call 108</a>
               </Button>
               <Button variant="outline" size="lg" asChild>
                 <a href="tel:1800-599-0019">AIIMS Helpline</a>
@@ -348,20 +346,13 @@ export default function PatientDashboard() {
       </Card>
       <Card className="shadow-card">
         <CardHeader>
-          <CardTitle className="font-display text-base">Warning Signs — Seek Immediate Help</CardTitle>
+          <CardTitle className="font-display text-base">{t("emergency.warningSigns")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {[
-              "Sudden loss of vision in one or both eyes",
-              "Sudden increase in floaters or flashes of light",
-              "Curtain-like shadow over your visual field",
-              "Severe eye pain with nausea or vomiting",
-              "Eye injury or foreign object in eye",
-              "Sudden onset of double vision",
-            ].map((item, i) => (
+            {["emergency.sign1", "emergency.sign2", "emergency.sign3", "emergency.sign4", "emergency.sign5", "emergency.sign6"].map((key, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="text-destructive mt-0.5 font-bold">!</span> {item}
+                <span className="text-destructive mt-0.5 font-bold">!</span> {t(key)}
               </li>
             ))}
           </ul>
