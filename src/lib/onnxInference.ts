@@ -96,10 +96,30 @@ async function loadSession(): Promise<ort.InferenceSession> {
   // Try cached model first
   let modelBuffer = await getCachedModel();
 
+  // Validate cached model - ONNX files start with magic bytes \x08
+  if (modelBuffer && modelBuffer.byteLength < 1000) {
+    console.warn("Cached ONNX model appears corrupted, re-fetching...");
+    modelBuffer = null;
+    // Clear bad cache
+    try {
+      const db = await openDB();
+      const tx = db.transaction("models", "readwrite");
+      tx.objectStore("models").delete("retinopathy");
+    } catch { /* ignore */ }
+  }
+
   if (!modelBuffer) {
     const response = await fetch("/models/retinopathy.onnx");
-    if (!response.ok) throw new Error("Failed to load ONNX model");
+    if (!response.ok) throw new Error(`Failed to load ONNX model: ${response.status}`);
+    const contentType = response.headers.get("content-type") || "";
+    // If Vite serves it as HTML (e.g. SPA fallback), the model is invalid
+    if (contentType.includes("text/html")) {
+      throw new Error("ONNX model served as HTML - file may be missing from public/models/");
+    }
     modelBuffer = await response.arrayBuffer();
+    if (modelBuffer.byteLength < 10000) {
+      throw new Error(`ONNX model too small (${modelBuffer.byteLength} bytes) - likely corrupted`);
+    }
     await cacheModel(modelBuffer);
   }
 
