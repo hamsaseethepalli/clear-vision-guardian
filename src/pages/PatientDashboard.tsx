@@ -12,6 +12,7 @@ import { PatientSidebar } from "@/components/PatientSidebar";
 import type { ONNXResult } from "@/lib/onnxInference";
 import type { Report, AnalysisStep } from "@/lib/types";
 import { Upload, FileText, Eye, AlertCircle, Download, History, BookOpen, Phone, HelpCircle, Bell } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/hooks/useI18n";
