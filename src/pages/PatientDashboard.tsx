@@ -95,8 +95,15 @@ export default function PatientDashboard() {
     updateStep(0, "complete");
     updateStep(1, "active");
 
-    // Step 2: AI Analysis (simulated for now — will use ONNX when model is provided)
-    const result = await simulateAIAnalysis();
+    // Step 2: AI Analysis using ONNX model
+    let result: ONNXResult;
+    try {
+      result = await analyzeRetinalImage(file);
+    } catch (err) {
+      toast({ title: "Analysis failed", description: "AI model could not process this image. Please try again.", variant: "destructive" });
+      setAnalyzing(false);
+      return;
+    }
 
     updateStep(1, "complete");
     updateStep(2, "active");
