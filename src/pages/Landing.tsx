@@ -49,14 +49,6 @@ export default function Landing() {
                   <Button variant="hero" size="lg" onClick={() => navigate("/signup")}>
                     Start Screening <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
-                    onClick={() => navigate("/login")}
-                  >
-                    Sign In
-                  </Button>
                 </div>
               </div>
               <div className="relative animate-fade-in">
