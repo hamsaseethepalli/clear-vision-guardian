@@ -20,7 +20,7 @@ export default function PatientDashboard() {
   const { user, signOut } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState<AIResult | null>(null);
+  const [aiResult, setAiResult] = useState<ONNXResult | null>(null);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [loadingReports, setLoadingReports] = useState(true);
