@@ -106,7 +106,7 @@ export default function Signup() {
     if (role === "doctor") {
       localStorage.setItem(
         "pending_doctor_application",
-        JSON.stringify({ license_number: license.trim(), specialization: specialization.trim() })
+        JSON.stringify({ license_number: license.trim(), specialization: specialization.trim(), hospital_id: hospitalId })
       );
     }
 
