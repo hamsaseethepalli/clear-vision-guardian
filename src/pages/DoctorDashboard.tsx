@@ -16,6 +16,7 @@ import {
   FileText, Users, AlertTriangle, BarChart3, History, Bell,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface CaseReport {
