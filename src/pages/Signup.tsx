@@ -37,7 +37,17 @@ export default function Signup() {
   const [specialization, setSpecialization] = useState("");
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [hospitalId, setHospitalId] = useState("");
+  const [hospitals, setHospitals] = useState<{ id: string; name: string; city: string | null }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      const { data } = await supabase.from("hospitals").select("id, name, city").order("name");
+      if (data) setHospitals(data);
+    };
+    fetchHospitals();
+  }, []);
 
   const validate = useCallback(() => {
     const errs: Record<string, string> = {};
