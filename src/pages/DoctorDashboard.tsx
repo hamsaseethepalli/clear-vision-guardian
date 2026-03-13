@@ -159,20 +159,89 @@ export default function DoctorDashboard() {
 
   const handleLogout = async () => { await signOut(); navigate("/"); };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Retino AI" className="h-8 w-8" />
-            <span className="font-display font-bold text-foreground">Doctor Console</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {myRequests.length > 0 && (
-              <Badge className="bg-destructive text-destructive-foreground animate-pulse">
-                <Bell className="h-3 w-3 mr-1" /> {myRequests.length} request{myRequests.length > 1 ? 's' : ''}
-              </Badge>
-            )}
+  const renderView = () => {
+    switch (activeView) {
+      case "home": return renderHomeView();
+      case "requests": return renderRequestsView();
+      case "cases": return renderCasesView();
+      case "patients": return renderPatientsView();
+      case "analytics": return <DoctorAnalytics cases={cases} />;
+      case "history": return renderHistoryView();
+      case "settings": return renderSettingsPlaceholder("Settings");
+      case "account": return renderSettingsPlaceholder("Account");
+      default: return renderHomeView();
+    }
+  };
+
+  const renderSettingsPlaceholder = (title: string) => (
+    <div className="text-center py-16">
+      <p className="text-muted-foreground">{title} — coming soon</p>
+    </div>
+  );
+
+  const renderHomeView = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      {/* Stats */}
+      <div className="grid sm:grid-cols-4 gap-4">
+        {[
+          { label: "Pending Review", value: pendingCount, icon: Clock, color: "text-warning" },
+          { label: "Approved", value: approvedCount, icon: CheckCircle2, color: "text-success" },
+          { label: "Total Cases", value: cases.length, icon: Users, color: "text-info" },
+          { label: "My Requests", value: myRequests.length, icon: Bell, color: "text-destructive" },
+        ].map((stat, i) => (
+          <motion.div key={stat.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ scale: 1.03, y: -2 }}>
+            <Card className="shadow-card hover:shadow-elevated transition-shadow cursor-pointer" onClick={() => {
+              if (stat.label === "My Requests") setActiveView("requests");
+              else if (stat.label === "Total Cases") setActiveView("cases");
+            }}>
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center">
+                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Quick requests preview */}
+      {myRequests.length > 0 && (
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4 text-destructive" /> Pending Requests
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {myRequests.slice(0, 3).map((c) => (
+                <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-primary/20 bg-accent/30 cursor-pointer hover:bg-accent/50 transition-all" onClick={() => setSelectedCase(c)}>
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <GradeScale activeGrade={c.grade} compact />
+                </div>
+              ))}
+              {myRequests.length > 3 && (
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => setActiveView("requests")}>
+                  View all {myRequests.length} requests
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
+  );
+
+  const renderRequestsView = () => (
             <span className="text-sm text-muted-foreground hidden sm:block">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" /> Logout
