@@ -47,6 +47,7 @@ export default function DoctorDashboard() {
   const [selectedCase, setSelectedCase] = useState<CaseReport | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending_review' | 'approved' | 'rejected'>('all');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState("home");
 
   useEffect(() => {
     fetchCases();
