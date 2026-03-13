@@ -1,13 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import logo from "@/assets/retino-logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, ArrowLeft, Loader2, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, CheckCircle2, Eye, EyeOff, Building2 } from "lucide-react";
 import {
   emailSchema,
   passwordSchema,
@@ -36,7 +37,17 @@ export default function Signup() {
   const [specialization, setSpecialization] = useState("");
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [hospitalId, setHospitalId] = useState("");
+  const [hospitals, setHospitals] = useState<{ id: string; name: string; city: string | null }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      const { data } = await supabase.from("hospitals").select("id, name, city").order("name");
+      if (data) setHospitals(data);
+    };
+    fetchHospitals();
+  }, []);
 
   const validate = useCallback(() => {
     const errs: Record<string, string> = {};
@@ -53,10 +64,11 @@ export default function Signup() {
       if (!lic.success) errs.license = lic.error.issues[0].message;
       const sp = specializationSchema.safeParse(specialization);
       if (!sp.success) errs.specialization = sp.error.issues[0].message;
+      if (!hospitalId) errs.hospital = "Please select your hospital";
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [firstName, lastName, email, password, role, license, specialization]);
+  }, [firstName, lastName, email, password, role, license, specialization, hospitalId]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +106,7 @@ export default function Signup() {
     if (role === "doctor") {
       localStorage.setItem(
         "pending_doctor_application",
-        JSON.stringify({ license_number: license.trim(), specialization: specialization.trim() })
+        JSON.stringify({ license_number: license.trim(), specialization: specialization.trim(), hospital_id: hospitalId })
       );
     }
 
@@ -131,6 +143,17 @@ export default function Signup() {
 
     setStep("done");
     toast({ title: "Email verified!", description: "Your account is now active." });
+
+    // Update hospital_id on profile for doctors
+    if (role === "doctor" && hospitalId) {
+      const { data: { user: verifiedUser } } = await supabase.auth.getUser();
+      if (verifiedUser) {
+        await supabase
+          .from("profiles")
+          .update({ hospital_id: hospitalId })
+          .eq("user_id", verifiedUser.id);
+      }
+    }
 
     // Redirect based on role after short delay
     setTimeout(() => {
@@ -274,6 +297,26 @@ export default function Signup() {
                         aria-invalid={!!errors.specialization}
                       />
                       {errors.specialization && <p className="text-xs text-destructive">{errors.specialization}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Hospital</Label>
+                      <Select value={hospitalId} onValueChange={setHospitalId}>
+                        <SelectTrigger aria-invalid={!!errors.hospital}>
+                          <SelectValue placeholder="Select your hospital" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hospitals.map((h) => (
+                            <SelectItem key={h.id} value={h.id}>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="h-3 w-3 text-muted-foreground" />
+                                <span>{h.name}</span>
+                                {h.city && <span className="text-muted-foreground text-xs">({h.city})</span>}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.hospital && <p className="text-xs text-destructive">{errors.hospital}</p>}
                     </div>
                     <p className="text-xs text-muted-foreground bg-accent/50 rounded-lg p-3">
                       <Shield className="inline h-3 w-3 mr-1" />

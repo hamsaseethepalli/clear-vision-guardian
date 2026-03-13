@@ -6,18 +6,18 @@ import { GradeScale } from "@/components/GradeScale";
 import { Badge } from "@/components/ui/badge";
 import { DoctorAnalytics } from "@/components/DoctorAnalytics";
 import { PatientTimeline } from "@/components/PatientTimeline";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import logo from "@/assets/retino-logo.png";
+import { DoctorSidebar } from "@/components/DoctorSidebar";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  LogOut, Search, CheckCircle2, XCircle, Clock,
-  FileText, Users, AlertTriangle, BarChart3, History, Bell,
+  Search, CheckCircle2, XCircle, Clock,
+  FileText, Users, Bell, History,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { motion, AnimatePresence } from "framer-motion";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { motion } from "framer-motion";
 
 interface CaseReport {
   id: string;
@@ -47,6 +47,7 @@ export default function DoctorDashboard() {
   const [selectedCase, setSelectedCase] = useState<CaseReport | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending_review' | 'approved' | 'rejected'>('all');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState("home");
 
   useEffect(() => {
     fetchCases();
@@ -55,10 +56,7 @@ export default function DoctorDashboard() {
   const fetchCases = async () => {
     const { data } = await supabase
       .from("reports")
-      .select(`
-        *,
-        profiles:patient_id(first_name, last_name)
-      `)
+      .select(`*, profiles:patient_id(first_name, last_name)`)
       .order("created_at", { ascending: false });
 
     if (data) {
@@ -83,7 +81,6 @@ export default function DoctorDashboard() {
     setLoading(false);
   };
 
-  // Requests specifically for this doctor
   const myRequests = useMemo(() => {
     if (!user) return [];
     return cases.filter(c => c.requested_doctor_id === user.id && c.status === 'pending_review');
@@ -156,272 +153,306 @@ export default function DoctorDashboard() {
     });
   };
 
-  const handleLogout = async () => { await signOut(); navigate("/"); };
+  // ── Views ──
 
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="Retino AI" className="h-8 w-8" />
-            <span className="font-display font-bold text-foreground">Doctor Console</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {myRequests.length > 0 && (
-              <Badge className="bg-destructive text-destructive-foreground animate-pulse">
-                <Bell className="h-3 w-3 mr-1" /> {myRequests.length} request{myRequests.length > 1 ? 's' : ''}
-              </Badge>
-            )}
-            <span className="text-sm text-muted-foreground hidden sm:block">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" /> Logout
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid sm:grid-cols-4 gap-4"
-        >
-          {[
-            { label: "Pending Review", value: pendingCount, icon: Clock, color: "text-warning" },
-            { label: "Approved", value: approvedCount, icon: CheckCircle2, color: "text-success" },
-            { label: "Total Cases", value: cases.length, icon: Users, color: "text-info" },
-            { label: "My Requests", value: myRequests.length, icon: Bell, color: "text-destructive" },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              whileHover={{ scale: 1.03, y: -2 }}
-            >
-              <Card className="shadow-card hover:shadow-elevated transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center">
-                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    </div>
+  const renderHomeView = () => (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      <div className="grid sm:grid-cols-4 gap-4">
+        {[
+          { label: "Pending Review", value: pendingCount, icon: Clock, color: "text-warning", view: "cases" },
+          { label: "Approved", value: approvedCount, icon: CheckCircle2, color: "text-success", view: "cases" },
+          { label: "Total Cases", value: cases.length, icon: Users, color: "text-info", view: "cases" },
+          { label: "My Requests", value: myRequests.length, icon: Bell, color: "text-destructive", view: "requests" },
+        ].map((stat, i) => (
+          <motion.div key={stat.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} whileHover={{ scale: 1.03, y: -2 }}>
+            <Card className="shadow-card hover:shadow-elevated transition-shadow cursor-pointer" onClick={() => setActiveView(stat.view)}>
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center">
+                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        {/* Tabs */}
-        <Tabs defaultValue="requests" className="space-y-6">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="requests" className="flex items-center gap-1.5">
-              <Bell className="h-4 w-4" /> Requests
-              {myRequests.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-destructive text-destructive-foreground">
-                  {myRequests.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="cases" className="flex items-center gap-1.5">
-              <FileText className="h-4 w-4" /> All Cases
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-1.5">
-              <BarChart3 className="h-4 w-4" /> Analytics
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-1.5">
-              <History className="h-4 w-4" /> Patient History
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Requests Tab */}
-          <TabsContent value="requests" className="space-y-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="font-display flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-primary" /> Verification Requests
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <p className="text-center text-muted-foreground py-8">Loading...</p>
-                  ) : myRequests.length === 0 ? (
-                    <div className="text-center py-12">
-                      <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" />
-                      <p className="text-muted-foreground">No pending verification requests</p>
-                      <p className="text-xs text-muted-foreground mt-1">All caught up! Check the "All Cases" tab for other pending reports.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {myRequests.map((c, i) => (
-                        <motion.div
-                          key={c.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                          className="flex items-center justify-between p-4 rounded-xl border-2 border-primary/20 bg-accent/30 hover:bg-accent/50 cursor-pointer transition-all"
-                          onClick={() => setSelectedCase(c)}
-                        >
-                          <div>
-                            <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(c.created_at).toLocaleDateString()} · Specifically requested you
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <GradeScale activeGrade={c.grade} compact />
-                            <Badge className="bg-primary/10 text-primary border-primary/20">
-                              Review Now
-                            </Badge>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          </TabsContent>
-
-          {/* Cases Tab */}
-          <TabsContent value="cases" className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search by Patient ID or Name..." className="pl-10" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              </div>
-              <div className="flex gap-2">
-                {(['all', 'pending_review', 'approved', 'rejected'] as const).map(f => (
-                  <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>
-                    {f === 'all' ? 'All' : f === 'pending_review' ? 'Pending' : f.charAt(0).toUpperCase() + f.slice(1)}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="font-display flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" /> Patient Cases
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <p className="text-center text-muted-foreground py-8">Loading cases...</p>
-                ) : (
-                  <div className="space-y-3">
-                    {filteredCases.map((c, i) => (
-                      <motion.div
-                        key={c.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.03 }}
-                        className="flex items-center justify-between p-4 rounded-lg border border-border/50 hover:bg-accent/30 cursor-pointer transition-colors"
-                        onClick={() => setSelectedCase(c)}
-                      >
-                        <div>
-                          <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
-                          <p className="text-xs text-muted-foreground">{c.patient_id.slice(0, 8)}</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <GradeScale activeGrade={c.grade} compact />
-                          <Badge variant="outline" className={
-                            c.status === 'pending_review' ? "bg-warning/10 text-warning border-warning/20" :
-                            c.status === 'approved' ? "bg-success/10 text-success border-success/20" :
-                            "bg-destructive/10 text-destructive border-destructive/20"
-                          }>
-                            {c.status === 'pending_review' ? 'Pending' : c.status}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground hidden sm:block">
-                            {new Date(c.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </motion.div>
-                    ))}
-                    {filteredCases.length === 0 && (
-                      <p className="text-center text-muted-foreground py-8">
-                        {cases.length === 0 ? "No cases yet." : "No cases match your search."}
-                      </p>
-                    )}
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </motion.div>
+        ))}
+      </div>
 
-          {/* Analytics Tab */}
-          <TabsContent value="analytics">
-            <DoctorAnalytics cases={cases} />
-          </TabsContent>
-
-          {/* Patient History Tab */}
-          <TabsContent value="history" className="space-y-6">
-            <div className="grid lg:grid-cols-3 gap-6">
-              <Card className="shadow-card lg:col-span-1">
-                <CardHeader className="pb-3">
-                  <CardTitle className="font-display text-sm flex items-center gap-2">
-                    <Users className="h-4 w-4 text-primary" /> Patients
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {uniquePatients.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No patients yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {uniquePatients.map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => setSelectedPatientId(p.id)}
-                          className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                            selectedPatientId === p.id
-                              ? 'border-primary bg-accent'
-                              : 'border-border/50 hover:bg-accent/30'
-                          }`}
-                        >
-                          <p className="font-medium text-sm text-foreground">{p.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {p.caseCount} report{p.caseCount !== 1 ? 's' : ''} · ID: {p.id.slice(0, 8)}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="lg:col-span-2">
-                {selectedPatientId ? (
-                  <PatientTimeline
-                    reports={selectedPatientReports.map(r => ({
-                      id: r.id,
-                      grade: r.grade,
-                      confidence: r.confidence,
-                      grade_label: r.grade_label,
-                      status: r.status,
-                      created_at: r.created_at,
-                      reviewed_at: r.reviewed_at,
-                    }))}
-                    patientName={selectedPatientName}
-                  />
-                ) : (
-                  <Card className="shadow-card">
-                    <CardContent className="py-16 text-center">
-                      <History className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground">Select a patient to view their history timeline.</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+      {myRequests.length > 0 && (
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-display text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4 text-destructive" /> Pending Requests
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {myRequests.slice(0, 3).map((c) => (
+                <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-primary/20 bg-accent/30 cursor-pointer hover:bg-accent/50 transition-all" onClick={() => setSelectedCase(c)}>
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <GradeScale activeGrade={c.grade} compact />
+                </div>
+              ))}
+              {myRequests.length > 3 && (
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => setActiveView("requests")}>
+                  View all {myRequests.length} requests
+                </Button>
+              )}
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
+  );
+
+  const renderRequestsView = () => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2">
+            <Bell className="h-5 w-5 text-primary" /> Verification Requests
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Loading...</p>
+          ) : myRequests.length === 0 ? (
+            <div className="text-center py-12">
+              <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-3" />
+              <p className="text-muted-foreground">No pending verification requests</p>
+              <p className="text-xs text-muted-foreground mt-1">All caught up!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {myRequests.map((c, i) => (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex items-center justify-between p-4 rounded-xl border-2 border-primary/20 bg-accent/30 hover:bg-accent/50 cursor-pointer transition-all"
+                  onClick={() => setSelectedCase(c)}
+                >
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(c.created_at).toLocaleDateString()} · Specifically requested you
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <GradeScale activeGrade={c.grade} compact />
+                    <Badge className="bg-primary/10 text-primary border-primary/20">Review Now</Badge>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  const renderCasesView = () => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by Patient ID or Name..." className="pl-10" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        </div>
+        <div className="flex gap-2">
+          {(['all', 'pending_review', 'approved', 'rejected'] as const).map(f => (
+            <Button key={f} variant={filter === f ? "default" : "outline"} size="sm" onClick={() => setFilter(f)}>
+              {f === 'all' ? 'All' : f === 'pending_review' ? 'Pending' : f.charAt(0).toUpperCase() + f.slice(1)}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" /> Patient Cases
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-center text-muted-foreground py-8">Loading cases...</p>
+          ) : (
+            <div className="space-y-3">
+              {filteredCases.map((c, i) => (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="flex items-center justify-between p-4 rounded-lg border border-border/50 hover:bg-accent/30 cursor-pointer transition-colors"
+                  onClick={() => setSelectedCase(c)}
+                >
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{c.patient_name}</p>
+                    <p className="text-xs text-muted-foreground">{c.patient_id.slice(0, 8)}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <GradeScale activeGrade={c.grade} compact />
+                    <Badge variant="outline" className={
+                      c.status === 'pending_review' ? "bg-warning/10 text-warning border-warning/20" :
+                      c.status === 'approved' ? "bg-success/10 text-success border-success/20" :
+                      "bg-destructive/10 text-destructive border-destructive/20"
+                    }>
+                      {c.status === 'pending_review' ? 'Pending' : c.status}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground hidden sm:block">
+                      {new Date(c.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+              {filteredCases.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">
+                  {cases.length === 0 ? "No cases yet." : "No cases match your search."}
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  const renderPatientsView = () => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" /> All Patients
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {uniquePatients.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No patients yet.</p>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {uniquePatients.map(p => (
+                <Card key={p.id} className="cursor-pointer hover:shadow-elevated transition-all" onClick={() => { setSelectedPatientId(p.id); setActiveView("history"); }}>
+                  <CardContent className="py-4">
+                    <p className="font-medium text-sm text-foreground">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {p.caseCount} report{p.caseCount !== 1 ? 's' : ''} · ID: {p.id.slice(0, 8)}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  const renderHistoryView = () => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div className="grid lg:grid-cols-3 gap-6">
+        <Card className="shadow-card lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="font-display text-sm flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Patients
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {uniquePatients.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No patients yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {uniquePatients.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPatientId(p.id)}
+                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                      selectedPatientId === p.id
+                        ? 'border-primary bg-accent'
+                        : 'border-border/50 hover:bg-accent/30'
+                    }`}
+                  >
+                    <p className="font-medium text-sm text-foreground">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {p.caseCount} report{p.caseCount !== 1 ? 's' : ''} · ID: {p.id.slice(0, 8)}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <div className="lg:col-span-2">
+          {selectedPatientId ? (
+            <PatientTimeline
+              reports={selectedPatientReports.map(r => ({
+                id: r.id,
+                grade: r.grade,
+                confidence: r.confidence,
+                grade_label: r.grade_label,
+                status: r.status,
+                created_at: r.created_at,
+                reviewed_at: r.reviewed_at,
+              }))}
+              patientName={selectedPatientName}
+            />
+          ) : (
+            <Card className="shadow-card">
+              <CardContent className="py-16 text-center">
+                <History className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">Select a patient to view their history timeline.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  const renderView = () => {
+    switch (activeView) {
+      case "home": return renderHomeView();
+      case "requests": return renderRequestsView();
+      case "cases": return renderCasesView();
+      case "patients": return renderPatientsView();
+      case "analytics": return <DoctorAnalytics cases={cases} />;
+      case "history": return renderHistoryView();
+      default: return renderHomeView();
+    }
+  };
+
+  const viewTitles: Record<string, string> = {
+    home: "Dashboard",
+    requests: "Verification Requests",
+    cases: "All Cases",
+    patients: "Patients",
+    analytics: "Analytics",
+    history: "Patient History",
+    settings: "Settings",
+    account: "Account",
+  };
+
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <DoctorSidebar activeView={activeView} onViewChange={setActiveView} requestCount={myRequests.length} />
+        <main className="flex-1 overflow-auto">
+          <header className="border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-40 px-4 h-14 flex items-center gap-3">
+            <SidebarTrigger />
+            <h1 className="font-display font-semibold text-foreground">{viewTitles[activeView] || "Dashboard"}</h1>
+          </header>
+          <div className="p-6">
+            {renderView()}
+          </div>
+        </main>
+      </div>
 
       {/* Decision Dialog */}
       <Dialog open={!!selectedCase} onOpenChange={() => setSelectedCase(null)}>
@@ -491,6 +522,6 @@ export default function DoctorDashboard() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </SidebarProvider>
   );
 }
