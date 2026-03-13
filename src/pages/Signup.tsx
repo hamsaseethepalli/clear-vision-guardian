@@ -68,7 +68,7 @@ export default function Signup() {
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [firstName, lastName, email, password, role, license, specialization]);
+  }, [firstName, lastName, email, password, role, license, specialization, hospitalId]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
