@@ -144,6 +144,17 @@ export default function Signup() {
     setStep("done");
     toast({ title: "Email verified!", description: "Your account is now active." });
 
+    // Update hospital_id on profile for doctors
+    if (role === "doctor" && hospitalId) {
+      const { data: { user: verifiedUser } } = await supabase.auth.getUser();
+      if (verifiedUser) {
+        await supabase
+          .from("profiles")
+          .update({ hospital_id: hospitalId })
+          .eq("user_id", verifiedUser.id);
+      }
+    }
+
     // Redirect based on role after short delay
     setTimeout(() => {
       navigate(role === "doctor" ? "/doctor" : "/patient");
