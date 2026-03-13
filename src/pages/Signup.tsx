@@ -64,6 +64,7 @@ export default function Signup() {
       if (!lic.success) errs.license = lic.error.issues[0].message;
       const sp = specializationSchema.safeParse(specialization);
       if (!sp.success) errs.specialization = sp.error.issues[0].message;
+      if (!hospitalId) errs.hospital = "Please select your hospital";
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
