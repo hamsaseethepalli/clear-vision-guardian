@@ -298,6 +298,26 @@ export default function Signup() {
                       />
                       {errors.specialization && <p className="text-xs text-destructive">{errors.specialization}</p>}
                     </div>
+                    <div className="space-y-2">
+                      <Label>Hospital</Label>
+                      <Select value={hospitalId} onValueChange={setHospitalId}>
+                        <SelectTrigger aria-invalid={!!errors.hospital}>
+                          <SelectValue placeholder="Select your hospital" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hospitals.map((h) => (
+                            <SelectItem key={h.id} value={h.id}>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="h-3 w-3 text-muted-foreground" />
+                                <span>{h.name}</span>
+                                {h.city && <span className="text-muted-foreground text-xs">({h.city})</span>}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.hospital && <p className="text-xs text-destructive">{errors.hospital}</p>}
+                    </div>
                     <p className="text-xs text-muted-foreground bg-accent/50 rounded-lg p-3">
                       <Shield className="inline h-3 w-3 mr-1" />
                       Doctor accounts require admin verification before activation.
