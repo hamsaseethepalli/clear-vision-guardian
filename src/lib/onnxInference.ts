@@ -109,10 +109,18 @@ function getSession(): Promise<ort.InferenceSession> {
  * - Output shape: [1, 3, 224, 224] (NCHW)
  */
 async function preprocessImage(file: File): Promise<ort.Tensor> {
-  const bitmap = await createImageBitmap(file);
+  // Use colorSpaceConversion: 'none' to prevent ICC profile corrections
+  // that differ from how PIL/PyTorch loads images
+  const bitmap = await createImageBitmap(file, {
+    colorSpaceConversion: 'none',
+    premultiplyAlpha: 'none',
+  });
 
+  // First resize to input size using high-quality interpolation
   const canvas = new OffscreenCanvas(INPUT_SIZE, INPUT_SIZE);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d", { colorSpace: 'srgb' })!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(bitmap, 0, 0, INPUT_SIZE, INPUT_SIZE);
   bitmap.close();
 
