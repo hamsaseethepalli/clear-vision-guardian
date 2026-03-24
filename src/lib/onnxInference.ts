@@ -78,9 +78,8 @@ async function loadSession(): Promise<ort.InferenceSession> {
   // Always clear potentially corrupted cache first
   await clearModelCache();
 
-  // Use direct URL-based loading - onnxruntime-web handles the fetch internally
-  // which avoids issues with Vite transforming or corrupting the binary
-  const modelUrl = `${window.location.origin}/models/retinopathy.onnx`;
+  // Load model directly from Hugging Face (353MB, too large to bundle)
+  const modelUrl = "https://huggingface.co/hamsaseethepalli/swin/resolve/main/dr_grading_model.onnx";
   
   console.log("Loading ONNX model from:", modelUrl);
 
