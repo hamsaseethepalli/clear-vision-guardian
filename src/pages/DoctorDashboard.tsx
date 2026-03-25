@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { GradeScale } from "@/components/GradeScale";
 import { Badge } from "@/components/ui/badge";
 import { DoctorAnalytics } from "@/components/DoctorAnalytics";
@@ -13,10 +14,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Search, CheckCircle2, XCircle, Clock,
-  FileText, Users, Bell, History,
+  FileText, Users, Bell, History, Building2, Settings, User, LogOut, Stethoscope,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 
 interface CaseReport {
@@ -37,6 +40,16 @@ interface CaseReport {
   requested_doctor_id: string | null;
 }
 
+interface DoctorProfile {
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  hospital_id: string | null;
+  hospital_name: string | null;
+  hospital_city: string | null;
+}
+
 export default function DoctorDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -48,10 +61,34 @@ export default function DoctorDashboard() {
   const [filter, setFilter] = useState<'all' | 'pending_review' | 'approved' | 'rejected'>('all');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState("home");
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
 
   useEffect(() => {
     fetchCases();
-  }, []);
+    fetchDoctorProfile();
+  }, [user]);
+
+  const fetchDoctorProfile = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("first_name, last_name, email, phone, hospital_id, hospitals:hospital_id(name, city)")
+      .eq("user_id", user.id)
+      .single();
+
+    if (data) {
+      const h = data.hospitals as any;
+      setDoctorProfile({
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email,
+        phone: data.phone,
+        hospital_id: data.hospital_id,
+        hospital_name: h?.name || null,
+        hospital_city: h?.city || null,
+      });
+    }
+  };
 
   const fetchCases = async () => {
     const { data } = await supabase
@@ -157,6 +194,36 @@ export default function DoctorDashboard() {
 
   const renderHomeView = () => (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      {/* Doctor Info Banner */}
+      {doctorProfile && (
+        <Card className="shadow-card border-primary/20 bg-gradient-to-r from-primary/5 to-accent/30">
+          <CardContent className="py-5">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Stethoscope className="h-7 w-7 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h2 className="font-display text-lg font-bold text-foreground">
+                  Dr. {doctorProfile.first_name} {doctorProfile.last_name}
+                </h2>
+                {doctorProfile.hospital_name && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Building2 className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      {doctorProfile.hospital_name}
+                      {doctorProfile.hospital_city && `, ${doctorProfile.hospital_city}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <Badge variant="outline" className="bg-success/10 text-success border-success/20 hidden sm:flex">
+                <CheckCircle2 className="h-3 w-3 mr-1" /> Active
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid sm:grid-cols-4 gap-4">
         {[
           { label: "Pending Review", value: pendingCount, icon: Clock, color: "text-warning", view: "cases" },
@@ -416,6 +483,100 @@ export default function DoctorDashboard() {
     </motion.div>
   );
 
+  const renderSettingsView = () => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-2xl">
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2">
+            <Settings className="h-5 w-5 text-primary" /> Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Hospital Affiliation</h3>
+            <div className="p-4 rounded-xl bg-accent/50 border border-border/50">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-foreground">
+                    {doctorProfile?.hospital_name || "Not assigned"}
+                  </p>
+                  {doctorProfile?.hospital_city && (
+                    <p className="text-xs text-muted-foreground">{doctorProfile.hospital_city}</p>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 bg-muted rounded-lg p-2">
+                🔒 Hospital affiliation is set during registration and cannot be changed. Contact admin for transfers.
+              </p>
+            </div>
+          </div>
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
+            <p className="text-sm text-muted-foreground">
+              You will receive notifications when patients request your review.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  const renderAccountView = () => (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-2xl">
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2">
+            <User className="h-5 w-5 text-primary" /> Account
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16">
+              <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">
+                {doctorProfile?.first_name?.[0]}{doctorProfile?.last_name?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="font-display text-lg font-bold text-foreground">
+                Dr. {doctorProfile?.first_name} {doctorProfile?.last_name}
+              </h2>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
+            </div>
+          </div>
+          <Separator />
+          <div className="grid gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Email</Label>
+              <p className="text-sm text-foreground">{user?.email}</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Hospital</Label>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                <p className="text-sm text-foreground">
+                  {doctorProfile?.hospital_name || "Not assigned"}
+                  {doctorProfile?.hospital_city && ` — ${doctorProfile.hospital_city}`}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Phone</Label>
+              <p className="text-sm text-foreground">{doctorProfile?.phone || "Not provided"}</p>
+            </div>
+          </div>
+          <Separator />
+          <Button variant="destructive" onClick={async () => { await signOut(); navigate("/"); }} className="w-full">
+            <LogOut className="h-4 w-4 mr-2" /> Sign Out
+          </Button>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
   const renderView = () => {
     switch (activeView) {
       case "home": return renderHomeView();
@@ -424,6 +585,8 @@ export default function DoctorDashboard() {
       case "patients": return renderPatientsView();
       case "analytics": return <DoctorAnalytics cases={cases} />;
       case "history": return renderHistoryView();
+      case "settings": return renderSettingsView();
+      case "account": return renderAccountView();
       default: return renderHomeView();
     }
   };
@@ -447,6 +610,12 @@ export default function DoctorDashboard() {
           <header className="border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-40 px-4 h-14 flex items-center gap-3">
             <SidebarTrigger />
             <h1 className="font-display font-semibold text-foreground">{viewTitles[activeView] || "Dashboard"}</h1>
+            {doctorProfile?.hospital_name && (
+              <div className="ml-auto hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Building2 className="h-3.5 w-3.5" />
+                {doctorProfile.hospital_name}
+              </div>
+            )}
           </header>
           <div className="p-6">
             {renderView()}
