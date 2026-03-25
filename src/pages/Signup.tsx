@@ -34,6 +34,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [license, setLicense] = useState("");
+  const [docId, setDocId] = useState(""); // ADDED DocID State
   const [specialization, setSpecialization] = useState("");
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -59,16 +60,18 @@ export default function Signup() {
     if (!em.success) errs.email = em.error.issues[0].message;
     const pw = passwordSchema.safeParse(password);
     if (!pw.success) errs.password = pw.error.issues[0].message;
+    
     if (role === "doctor") {
       const lic = licenseSchema.safeParse(license);
       if (!lic.success) errs.license = lic.error.issues[0].message;
       const sp = specializationSchema.safeParse(specialization);
       if (!sp.success) errs.specialization = sp.error.issues[0].message;
       if (!hospitalId) errs.hospital = "Please select your hospital";
+      if (!docId.trim()) errs.docId = "Doctor ID is required"; // DocID validation
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [firstName, lastName, email, password, role, license, specialization, hospitalId]);
+  }, [firstName, lastName, email, password, role, license, docId, specialization, hospitalId]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +84,6 @@ export default function Signup() {
 
     setLoading(true);
 
-    // Create unverified account — Supabase sends OTP email automatically
     const { error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
@@ -100,14 +102,6 @@ export default function Signup() {
     if (error) {
       toast({ title: "Signup failed", description: error.message, variant: "destructive" });
       return;
-    }
-
-    // Store doctor application intent
-    if (role === "doctor") {
-      localStorage.setItem(
-        "pending_doctor_application",
-        JSON.stringify({ license_number: license.trim(), specialization: specialization.trim(), hospital_id: hospitalId })
-      );
     }
 
     toast({ title: "Verification code sent!", description: `Check your inbox at ${email}` });
@@ -141,19 +135,29 @@ export default function Signup() {
       return;
     }
 
-    setStep("done");
     toast({ title: "Email verified!", description: "Your account is now active." });
 
-    // Update hospital_id on profile for doctors
+    // --- CRITICAL FIX: Save Hospital, DocID, and Submit Application ---
     if (role === "doctor" && hospitalId) {
       const { data: { user: verifiedUser } } = await supabase.auth.getUser();
       if (verifiedUser) {
-        await supabase
-          .from("profiles")
-          .update({ hospital_id: hospitalId })
-          .eq("user_id", verifiedUser.id);
+        
+        // 1. Update Profile properly (Fixes "Not Assigned")
+        // We attempt both 'id' and 'user_id' to cover different Supabase schema versions
+        await supabase.from("profiles").update({ hospital_id: hospitalId, doc_id: docId }).eq("id", verifiedUser.id);
+        await supabase.from("profiles").update({ hospital_id: hospitalId, doc_id: docId }).eq("user_id", verifiedUser.id);
+
+        // 2. Submit to Admin Queue (Fixes "No verified doctors" in Patient console)
+        await supabase.from("doctor_applications").insert({
+          user_id: verifiedUser.id,
+          license_number: license.trim(),
+          specialization: specialization.trim(),
+          status: "pending"
+        });
       }
     }
+
+    setStep("done");
 
     // Redirect based on role after short delay
     setTimeout(() => {
@@ -166,7 +170,6 @@ export default function Signup() {
       toast({ title: "Too many resend attempts", description: "Please wait 2 minutes.", variant: "destructive" });
       return;
     }
-
     const { error } = await supabase.auth.resend({ type: "signup", email: email.trim().toLowerCase() });
     if (error) {
       toast({ title: "Resend failed", description: error.message, variant: "destructive" });
@@ -196,10 +199,8 @@ export default function Signup() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* ── Step 1: Information ── */}
           {step === "info" && (
             <>
-              {/* Role selector */}
               <div className="flex gap-2 mb-6">
                 {(["patient", "doctor"] as const).map((r) => (
                   <button
@@ -221,35 +222,18 @@ export default function Signup() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>First Name</Label>
-                    <Input
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      aria-invalid={!!errors.firstName}
-                    />
+                    <Input placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} aria-invalid={!!errors.firstName} />
                     {errors.firstName && <p className="text-xs text-destructive">{errors.firstName}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label>Last Name</Label>
-                    <Input
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      aria-invalid={!!errors.lastName}
-                    />
+                    <Input placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} aria-invalid={!!errors.lastName} />
                     {errors.lastName && <p className="text-xs text-destructive">{errors.lastName}</p>}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    aria-invalid={!!errors.email}
-                  />
+                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!!errors.email} />
                   {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-2">
@@ -260,7 +244,6 @@ export default function Signup() {
                       placeholder="Min. 8 chars, upper, lower, number, special"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="new-password"
                       aria-invalid={!!errors.password}
                       className="pr-10"
                     />
@@ -268,7 +251,6 @@ export default function Signup() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -279,23 +261,18 @@ export default function Signup() {
                 {role === "doctor" && (
                   <>
                     <div className="space-y-2">
+                      <Label>Doctor ID (DocID)</Label>
+                      <Input placeholder="e.g. DOC-1234" value={docId} onChange={(e) => setDocId(e.target.value)} aria-invalid={!!errors.docId} />
+                      {errors.docId && <p className="text-xs text-destructive">{errors.docId}</p>}
+                    </div>
+                    <div className="space-y-2">
                       <Label>Medical License Number</Label>
-                      <Input
-                        placeholder="e.g. MCI-12345"
-                        value={license}
-                        onChange={(e) => setLicense(e.target.value)}
-                        aria-invalid={!!errors.license}
-                      />
+                      <Input placeholder="e.g. MCI-12345" value={license} onChange={(e) => setLicense(e.target.value)} aria-invalid={!!errors.license} />
                       {errors.license && <p className="text-xs text-destructive">{errors.license}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Specialization</Label>
-                      <Input
-                        placeholder="e.g. Ophthalmology"
-                        value={specialization}
-                        onChange={(e) => setSpecialization(e.target.value)}
-                        aria-invalid={!!errors.specialization}
-                      />
+                      <Input placeholder="e.g. Ophthalmology" value={specialization} onChange={(e) => setSpecialization(e.target.value)} aria-invalid={!!errors.specialization} />
                       {errors.specialization && <p className="text-xs text-destructive">{errors.specialization}</p>}
                     </div>
                     <div className="space-y-2">
@@ -326,70 +303,38 @@ export default function Signup() {
                 )}
 
                 <Button type="submit" className="w-full" variant="hero" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...
-                    </>
-                  ) : (
-                    "Send Verification Code"
-                  )}
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send Verification Code"}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}
-                  <Link to="/login" className="text-primary hover:underline font-medium">
-                    Sign in
-                  </Link>
+                  <Link to="/login" className="text-primary hover:underline font-medium">Sign in</Link>
                 </p>
               </form>
             </>
           )}
 
-          {/* ── Step 2: OTP Verification ── */}
           {step === "otp" && (
             <div className="space-y-6">
               <div className="flex justify-center">
                 <InputOTP maxLength={6} value={otp} onChange={setOtp}>
                   <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
+                    <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
                   </InputOTPGroup>
                 </InputOTP>
               </div>
-
-              <Button
-                className="w-full"
-                variant="hero"
-                disabled={loading || otp.length !== 6}
-                onClick={handleVerifyOtp}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...
-                  </>
-                ) : (
-                  "Verify & Create Account"
-                )}
+              <Button className="w-full" variant="hero" disabled={loading || otp.length !== 6} onClick={handleVerifyOtp}>
+                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : "Verify & Create Account"}
               </Button>
-
               <div className="flex items-center justify-between text-sm">
-                <button
-                  onClick={() => { setStep("info"); setOtp(""); }}
-                  className="text-muted-foreground hover:text-foreground flex items-center gap-1"
-                >
+                <button onClick={() => { setStep("info"); setOtp(""); }} className="text-muted-foreground hover:text-foreground flex items-center gap-1">
                   <ArrowLeft className="h-3 w-3" /> Back
                 </button>
-                <button onClick={handleResendOtp} className="text-primary hover:underline">
-                  Resend code
-                </button>
+                <button onClick={handleResendOtp} className="text-primary hover:underline">Resend code</button>
               </div>
             </div>
           )}
 
-          {/* ── Step 3: Success ── */}
           {step === "done" && (
             <div className="text-center space-y-4 py-4">
               <CheckCircle2 className="mx-auto h-16 w-16 text-success" />
