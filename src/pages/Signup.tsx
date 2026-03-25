@@ -42,7 +42,6 @@ export default function Signup() {
   const [hospitals, setHospitals] = useState<{ id: string; name: string; city: string | null }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Fetch Hospitals for the dropdown
   useEffect(() => {
     const fetchHospitals = async () => {
       const { data } = await supabase.from("hospitals").select("id, name, city").order("name");
@@ -92,7 +91,7 @@ export default function Signup() {
         data: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          role, // Store intended role in metadata temporarily
+          role,
         },
         emailRedirectTo: window.location.origin,
       },
@@ -138,36 +137,30 @@ export default function Signup() {
 
     toast({ title: "Email verified!", description: "Your account is now active." });
 
-    // --- INSTANT DOCTOR ACTIVATION & HOSPITAL LOCK ---
+    // INSTANT DOCTOR ACTIVATION - BYPASSES ADMIN COMPLETELY
     if (role === "doctor" && hospitalId) {
       const { data: { user: verifiedUser } } = await supabase.auth.getUser();
       if (verifiedUser) {
         
-        // 1. Lock the Hospital and DocID into the profile
+        // 1. Assign Hospital and DocID to profile instantly
         await supabase.from("profiles")
           .update({ hospital_id: hospitalId, doc_id: docId })
           .eq("id", verifiedUser.id);
           
-        // Redundancy check for alternative schema designs
-        await supabase.from("profiles")
-          .update({ hospital_id: hospitalId, doc_id: docId })
-          .eq("user_id", verifiedUser.id);
-
-        // 2. INSTANTLY grant the doctor role (Bypasses the Admin)
+        // 2. Instantly grant the doctor role so they appear for patients
         const { error: roleError } = await supabase.from("user_roles").insert({
           user_id: verifiedUser.id,
           role: "doctor"
         });
 
         if (roleError) {
-          console.error("Error setting role. Make sure the RLS policy is enabled:", roleError);
+          console.error("Role assignment error:", roleError);
         }
       }
     }
 
     setStep("done");
 
-    // Redirect to the correct dashboard based on role
     setTimeout(() => {
       navigate(role === "doctor" ? "/doctor" : "/patient");
     }, 1500);
@@ -303,10 +296,6 @@ export default function Signup() {
                       </Select>
                       {errors.hospital && <p className="text-xs text-destructive">{errors.hospital}</p>}
                     </div>
-                    <p className="text-xs text-muted-foreground bg-accent/50 rounded-lg p-3">
-                      <Shield className="inline h-3 w-3 mr-1" />
-                      By signing up, you will be instantly available to patients at this hospital. This association cannot be changed later.
-                    </p>
                   </>
                 )}
 
