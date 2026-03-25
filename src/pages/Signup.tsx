@@ -34,7 +34,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [license, setLicense] = useState("");
-  const [docId, setDocId] = useState(""); // ADDED DocID State
+  const [docId, setDocId] = useState(""); 
   const [specialization, setSpecialization] = useState("");
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,6 +42,7 @@ export default function Signup() {
   const [hospitals, setHospitals] = useState<{ id: string; name: string; city: string | null }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Fetch Hospitals for the dropdown
   useEffect(() => {
     const fetchHospitals = async () => {
       const { data } = await supabase.from("hospitals").select("id, name, city").order("name");
@@ -67,7 +68,7 @@ export default function Signup() {
       const sp = specializationSchema.safeParse(specialization);
       if (!sp.success) errs.specialization = sp.error.issues[0].message;
       if (!hospitalId) errs.hospital = "Please select your hospital";
-      if (!docId.trim()) errs.docId = "Doctor ID is required"; // DocID validation
+      if (!docId.trim()) errs.docId = "Doctor ID is required";
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -91,7 +92,7 @@ export default function Signup() {
         data: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          role,
+          role, // Store intended role in metadata temporarily
         },
         emailRedirectTo: window.location.origin,
       },
@@ -137,29 +138,36 @@ export default function Signup() {
 
     toast({ title: "Email verified!", description: "Your account is now active." });
 
-    // --- CRITICAL FIX: Save Hospital, DocID, and Submit Application ---
+    // --- INSTANT DOCTOR ACTIVATION & HOSPITAL LOCK ---
     if (role === "doctor" && hospitalId) {
       const { data: { user: verifiedUser } } = await supabase.auth.getUser();
       if (verifiedUser) {
         
-        // 1. Update Profile properly (Fixes "Not Assigned")
-        // We attempt both 'id' and 'user_id' to cover different Supabase schema versions
-        await supabase.from("profiles").update({ hospital_id: hospitalId, doc_id: docId }).eq("id", verifiedUser.id);
-        await supabase.from("profiles").update({ hospital_id: hospitalId, doc_id: docId }).eq("user_id", verifiedUser.id);
+        // 1. Lock the Hospital and DocID into the profile
+        await supabase.from("profiles")
+          .update({ hospital_id: hospitalId, doc_id: docId })
+          .eq("id", verifiedUser.id);
+          
+        // Redundancy check for alternative schema designs
+        await supabase.from("profiles")
+          .update({ hospital_id: hospitalId, doc_id: docId })
+          .eq("user_id", verifiedUser.id);
 
-        // 2. Submit to Admin Queue (Fixes "No verified doctors" in Patient console)
-        await supabase.from("doctor_applications").insert({
+        // 2. INSTANTLY grant the doctor role (Bypasses the Admin)
+        const { error: roleError } = await supabase.from("user_roles").insert({
           user_id: verifiedUser.id,
-          license_number: license.trim(),
-          specialization: specialization.trim(),
-          status: "pending"
+          role: "doctor"
         });
+
+        if (roleError) {
+          console.error("Error setting role. Make sure the RLS policy is enabled:", roleError);
+        }
       }
     }
 
     setStep("done");
 
-    // Redirect based on role after short delay
+    // Redirect to the correct dashboard based on role
     setTimeout(() => {
       navigate(role === "doctor" ? "/doctor" : "/patient");
     }, 1500);
@@ -276,7 +284,7 @@ export default function Signup() {
                       {errors.specialization && <p className="text-xs text-destructive">{errors.specialization}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label>Hospital</Label>
+                      <Label>Hospital Association</Label>
                       <Select value={hospitalId} onValueChange={setHospitalId}>
                         <SelectTrigger aria-invalid={!!errors.hospital}>
                           <SelectValue placeholder="Select your hospital" />
@@ -297,7 +305,7 @@ export default function Signup() {
                     </div>
                     <p className="text-xs text-muted-foreground bg-accent/50 rounded-lg p-3">
                       <Shield className="inline h-3 w-3 mr-1" />
-                      Doctor accounts require admin verification before activation.
+                      By signing up, you will be instantly available to patients at this hospital. This association cannot be changed later.
                     </p>
                   </>
                 )}
